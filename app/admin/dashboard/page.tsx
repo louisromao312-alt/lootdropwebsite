@@ -1,8 +1,14 @@
-import { redirect } from "next/navigation";
-import { isAdminUser, getDiscordUsername } from "@/lib/admin";
+import {
+  isAdminUser,
+  getDiscordIdentityCandidates,
+  getAdminDiscordUsernames,
+  getDiscordUsername,
+} from "@/lib/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { redirect } from "next/navigation";
 import AdminDashboardClient from "./AdminDashboardClient";
+import AdminAccessDenied from "./AdminAccessDenied";
 
 export const metadata = {
   title: "LootDrop Admin — Mission Control",
@@ -24,7 +30,12 @@ export default async function AdminDashboardPage() {
   }
 
   if (!isAdminUser(user)) {
-    redirect("/dashboard");
+    return (
+      <AdminAccessDenied
+        detectedIdentities={getDiscordIdentityCandidates(user)}
+        expectedAdmins={getAdminDiscordUsernames()}
+      />
+    );
   }
 
   const adminLabel =
