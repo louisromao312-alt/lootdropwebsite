@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   LineChart,
   Line,
@@ -11,9 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { supabase } from "@/utils/supabase";
 import {
-  checkAdminAccess,
   getAdminDashboardData,
   increaseServerBudget,
   type AdminDashboardData,
@@ -35,12 +32,8 @@ import {
   Shield,
   Terminal,
 } from "lucide-react";
-import type { User } from "@supabase/supabase-js";
 
-const LEVEL_STYLES: Record<
-  LogLevel,
-  { badge: string; dot: string }
-> = {
+const LEVEL_STYLES: Record<LogLevel, { badge: string; dot: string }> = {
   INFO: {
     badge: "bg-blue-500/15 text-blue-400 border-blue-500/30",
     dot: "bg-blue-400",
@@ -92,48 +85,23 @@ function formatChartDate(isoDate: string) {
   return d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
 }
 
-export default function AdminDashboardClient() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+interface AdminDashboardClientProps {
+  adminLabel: string;
+}
+
+export default function AdminDashboardClient({ adminLabel }: AdminDashboardClientProps) {
   const [dataLoading, setDataLoading] = useState(true);
   const [data, setData] = useState<AdminDashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // Budget-Formular
   const [serverSlug, setServerSlug] = useState("");
   const [budgetAmount, setBudgetAmount] = useState("");
   const [budgetSubmitting, setBudgetSubmitting] = useState(false);
 
-  // Admin-Auth serverseitig prüfen (ADMIN_EMAILS nur auf dem Server verfügbar)
-  useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const u = session?.user ?? null;
-
-      if (!u || !session?.access_token) {
-        router.replace("/login");
-        return;
-      }
-
-      const { isAdmin } = await checkAdminAccess(session.access_token);
-
-      if (!isAdmin) {
-        router.replace("/dashboard");
-        return;
-      }
-
-      setUser(u);
-      setAccessToken(session.access_token);
-      setAuthLoading(false);
-    });
-  }, [router]);
-
-  const loadDashboard = useCallback(async (token: string) => {
+  const loadDashboard = useCallback(async () => {
     setDataLoading(true);
     setError(null);
     try {
-      const result = await getAdminDashboardData(token);
+      const result = await getAdminDashboardData();
       setData(result);
       if (result.serverBudgets.length > 0 && !serverSlug) {
         setServerSlug(result.serverBudgets[0].server_slug);
@@ -147,14 +115,11 @@ export default function AdminDashboardClient() {
   }, [serverSlug]);
 
   useEffect(() => {
-    if (accessToken) {
-      loadDashboard(accessToken);
-    }
-  }, [accessToken, loadDashboard]);
+    void loadDashboard();
+  }, [loadDashboard]);
 
   const handleBudgetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!accessToken) return;
 
     const amount = Number(budgetAmount);
     if (!serverSlug || !Number.isFinite(amount) || amount <= 0) {
@@ -164,10 +129,10 @@ export default function AdminDashboardClient() {
 
     setBudgetSubmitting(true);
     try {
-      const result = await increaseServerBudget(accessToken, serverSlug, amount);
+      const result = await increaseServerBudget(serverSlug, amount);
       toast.success(`Budget erhöht auf ${result.newBudget.toLocaleString("de-DE")} LC`);
       setBudgetAmount("");
-      await loadDashboard(accessToken);
+      await loadDashboard();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Budget konnte nicht erhöht werden.";
       toast.error(message);
@@ -176,20 +141,8 @@ export default function AdminDashboardClient() {
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="flex min-h-[calc(100vh-8rem)] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="text-sm text-muted-foreground">Admin-Zugang wird geprüft…</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <div className="flex items-center gap-2 mb-2">
@@ -202,14 +155,14 @@ export default function AdminDashboardClient() {
           </div>
           <h1 className="text-2xl md:text-3xl font-bold">Admin Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            System-Gesundheit, Logs & Economy-Budgets — eingeloggt als {user?.email}
+            System-Gesundheit, Logs & Economy-Budgets — eingeloggt als {adminLabel}
           </p>
         </div>
         <Button
           variant="outline"
           size="sm"
-          disabled={dataLoading || !accessToken}
-          onClick={() => accessToken && loadDashboard(accessToken)}
+          disabled={dataLoading}
+          onClick={() => void loadDashboard()}
           className="border-border/50 hover:border-primary/40 self-start"
         >
           <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${dataLoading ? "animate-spin" : ""}`} />
@@ -223,7 +176,6 @@ export default function AdminDashboardClient() {
         </div>
       )}
 
-      {/* ── Health Cards ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <Card className="bg-card/60 border-border/50">
           <CardHeader className="pb-2">
@@ -237,13 +189,11 @@ export default function AdminDashboardClient() {
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             ) : data ? (
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <StatusIcon status={data.pluginHealth.status} />
-                    <Badge variant="outline" className={statusBadgeClass(data.pluginHealth.status)}>
-                      {data.pluginHealth.label}
-                    </Badge>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <StatusIcon status={data.pluginHealth.status} />
+                  <Badge variant="outline" className={statusBadgeClass(data.pluginHealth.status)}>
+                    {data.pluginHealth.label}
+                  </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">{data.pluginHealth.detail}</p>
                 <p className="text-xs font-mono text-muted-foreground/80">
@@ -315,7 +265,6 @@ export default function AdminDashboardClient() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
-        {/* ── Chart ──────────────────────────────────────────────────────── */}
         <Card className="xl:col-span-2 bg-card/60 border-border/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -340,11 +289,7 @@ export default function AdminDashboardClient() {
                       stroke="oklch(0.55 0 0)"
                       fontSize={11}
                     />
-                    <YAxis
-                      allowDecimals={false}
-                      stroke="oklch(0.55 0 0)"
-                      fontSize={11}
-                    />
+                    <YAxis allowDecimals={false} stroke="oklch(0.55 0 0)" fontSize={11} />
                     <Tooltip
                       contentStyle={{
                         background: "oklch(0.11 0 0)",
@@ -370,7 +315,6 @@ export default function AdminDashboardClient() {
           </CardContent>
         </Card>
 
-        {/* ── Budget Form ────────────────────────────────────────────────── */}
         <Card className="bg-card/60 border-border/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -438,7 +382,6 @@ export default function AdminDashboardClient() {
         </Card>
       </div>
 
-      {/* ── System Logs ──────────────────────────────────────────────────── */}
       <Card className="bg-card/60 border-border/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -494,7 +437,7 @@ export default function AdminDashboardClient() {
             </table>
           ) : (
             <div className="py-12 text-center text-sm text-muted-foreground">
-              Keine Log-Einträge vorhanden.
+              Keine Log-Einträge vorhanden. Führe supabase/admin-dashboard.sql im SQL-Editor aus.
             </div>
           )}
         </CardContent>

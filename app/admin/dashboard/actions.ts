@@ -1,6 +1,8 @@
-import { createClient } from "@supabase/supabase-js";
-import { isAdminEmail } from "@/lib/admin";
+"use server";
+
 import { createServiceRoleClient } from "@/lib/supabase-admin";
+import { isAdminUser, getDiscordUsername } from "@/lib/admin";
+import { createServerSupabase } from "@/lib/supabase/server";
 
 // ─── Typen ───────────────────────────────────────────────────────────────────
 
@@ -42,30 +44,20 @@ export interface AdminDashboardData {
   serverBudgets: ServerBudget[];
 }
 
-// ─── Auth-Helfer (Server) ────────────────────────────────────────────────────
+// ─── Auth-Helfer (Server, Cookie-Session) ────────────────────────────────────
 
-async function verifyAdminAccess(accessToken: string) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    throw new Error("Supabase nicht konfiguriert.");
-  }
-
-  const authClient = createClient(url, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-
+async function requireAdmin() {
+  const supabase = await createServerSupabase();
   const {
     data: { user },
     error,
-  } = await authClient.auth.getUser(accessToken);
+  } = await supabase.auth.getUser();
 
   if (error || !user) {
     throw new Error("Nicht authentifiziert.");
   }
 
-  if (!isAdminEmail(user.email)) {
+  if (!isAdminUser(user)) {
     throw new Error("Kein Administrator-Zugang.");
   }
 
@@ -164,7 +156,6 @@ async function fetchRedemptionsPerDay(
 
   if (error) throw error;
 
-  // Letzte 7 Tage initialisieren (auch Tage ohne Einlösungen)
   const days: Record<string, number> = {};
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
@@ -196,38 +187,29 @@ async function fetchServerBudgets(
 
 // ─── Server Actions ──────────────────────────────────────────────────────────
 
-export async function checkAdminAccess(
-  accessToken: string
-): Promise<{ isAdmin: boolean; email: string | null }> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    return { isAdmin: false, email: null };
-  }
-
-  const authClient = createClient(url, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-
+export async function checkAdminAccess(): Promise<{
+  isAdmin: boolean;
+  email: string | null;
+  displayName: string | null;
+}> {
+  const supabase = await createServerSupabase();
   const {
     data: { user },
-  } = await authClient.auth.getUser(accessToken);
+  } = await supabase.auth.getUser();
 
-  if (!user?.email) {
-    return { isAdmin: false, email: null };
+  if (!user) {
+    return { isAdmin: false, email: null, displayName: null };
   }
 
   return {
-    isAdmin: isAdminEmail(user.email),
-    email: user.email,
+    isAdmin: isAdminUser(user),
+    email: user.email ?? null,
+    displayName: getDiscordUsername(user) ?? user.email ?? null,
   };
 }
 
-export async function getAdminDashboardData(
-  accessToken: string
-): Promise<AdminDashboardData> {
-  await verifyAdminAccess(accessToken);
+export async function getAdminDashboardData(): Promise<AdminDashboardData> {
+  await requireAdmin();
   const db = createServiceRoleClient();
 
   const [pluginLastSeen, botLastSeen, logs, totalRevenue, redemptionsPerDay, serverBudgets] =
@@ -251,11 +233,10 @@ export async function getAdminDashboardData(
 }
 
 export async function increaseServerBudget(
-  accessToken: string,
   serverSlug: string,
   amount: number
 ): Promise<{ success: boolean; newBudget: number }> {
-  await verifyAdminAccess(accessToken);
+  await requireAdmin();
 
   if (!serverSlug?.trim()) {
     throw new Error("Server-Slug ist erforderlich.");

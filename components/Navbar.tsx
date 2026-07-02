@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { supabase, signOut } from "@/utils/supabase";
+import { checkAdminAccess } from "@/app/admin/dashboard/actions";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -14,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Shield,
   Zap,
   LayoutDashboard,
   ShoppingBag,
@@ -32,6 +34,7 @@ const navLinks = [
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
@@ -41,6 +44,13 @@ export default function Navbar() {
         data: { user },
       } = await supabase.auth.getUser();
       setUser(user ?? null);
+
+      if (user) {
+        const { isAdmin: admin } = await checkAdminAccess();
+        setIsAdmin(admin);
+      } else {
+        setIsAdmin(false);
+      }
     };
 
     void loadUser();
@@ -50,10 +60,12 @@ export default function Navbar() {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") {
         setUser(null);
+        setIsAdmin(false);
         return;
       }
       if (session?.user) {
         setUser(session.user);
+        void checkAdminAccess().then(({ isAdmin: admin }) => setIsAdmin(admin));
       }
     });
 
@@ -111,6 +123,19 @@ export default function Navbar() {
               </Link>
             );
           })}
+          {isAdmin && (
+            <Link
+              href="/admin/dashboard"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                pathname.startsWith("/admin")
+                  ? "text-primary bg-primary/10"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+              }`}
+            >
+              <Shield className="h-4 w-4" />
+              Mission Control
+            </Link>
+          )}
         </div>
 
         {/* Right: Auth */}
@@ -137,6 +162,14 @@ export default function Navbar() {
                     Dashboard
                   </Link>
                 </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard" className="flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      Mission Control
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleSignOut}
@@ -179,6 +212,16 @@ export default function Navbar() {
                 {label}
               </Link>
             ))}
+            {isAdmin && (
+              <Link
+                href="/admin/dashboard"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition"
+              >
+                <Shield className="h-4 w-4" />
+                Mission Control
+              </Link>
+            )}
             {!user && (
               <Button asChild className="mt-2 neon-glow">
                 <Link href="/login" onClick={() => setMobileOpen(false)}>

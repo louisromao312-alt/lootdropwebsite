@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { signInWithDiscordAction } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,25 +23,20 @@ export default function LoginClient({ supabaseConfigured }: LoginClientProps) {
   useEffect(() => {
     const callbackError = searchParams.get("error");
     if (callbackError) {
+      const messages: Record<string, string> = {
+        auth_callback_failed: "Discord-Login fehlgeschlagen. Bitte erneut versuchen.",
+        supabase_not_configured: CONFIG_ERROR,
+      };
       setError(
-        callbackError === "auth_callback_failed"
-          ? "Discord-Login fehlgeschlagen. Bitte erneut versuchen."
-          : decodeURIComponent(callbackError)
+        messages[callbackError] ?? decodeURIComponent(callbackError)
       );
     }
   }, [searchParams]);
 
-  const handleDiscordLogin = async () => {
+  const handleDiscordLogin = () => {
     setLoading(true);
     setError(null);
-    try {
-      const { url } = await signInWithDiscordAction();
-      window.location.href = url;
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Unbekannter Fehler";
-      setError(`Login fehlgeschlagen: ${message}`);
-      setLoading(false);
-    }
+    window.location.href = "/auth/login";
   };
 
   return (
