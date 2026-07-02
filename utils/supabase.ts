@@ -1,23 +1,17 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-let supabaseClient = null;
+let supabaseClient: SupabaseClient | null = null;
 
-/**
- * Prüft ob Supabase-Umgebungsvariablen gesetzt sind.
- * Wichtig für Build-Zeit (Vercel) wenn Env-Vars noch fehlen.
- */
-export function isSupabaseConfigured() {
+/** Prüft ob Supabase-Umgebungsvariablen gesetzt sind. */
+export function isSupabaseConfigured(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
 }
 
-/**
- * Lazy Supabase-Client – wirft erst bei Nutzung, nicht beim Import.
- * Verhindert Build-Fehler wenn Env-Vars temporär fehlen.
- */
-export function getSupabase() {
+/** Lazy Supabase-Client – wirft erst bei Nutzung, nicht beim Import. */
+export function getSupabase(): SupabaseClient {
   if (!isSupabaseConfigured()) {
     throw new Error(
       "Fehlende Supabase Umgebungsvariablen. Bitte .env.local prüfen."
@@ -26,32 +20,27 @@ export function getSupabase() {
 
   if (!supabaseClient) {
     supabaseClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
   }
 
   return supabaseClient;
 }
 
-// Rückwärtskompatibel: bestehende Imports von `supabase` funktionieren weiter
-export const supabase = new Proxy(
-  {},
-  {
-    get(_target, prop) {
-      const client = getSupabase();
-      const value = client[prop];
-      return typeof value === "function" ? value.bind(client) : value;
-    },
-  }
-);
+/** Rückwärtskompatibler Export mit korrektem TypeScript-Typ. */
+export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    const client = getSupabase();
+    const value = client[prop as keyof SupabaseClient];
+    return typeof value === "function"
+      ? (value as (...args: unknown[]) => unknown).bind(client)
+      : value;
+  },
+});
 
 // ─── AUTH ────────────────────────────────────────────────────────────────────
 
-/**
- * Discord OAuth Login via Supabase Auth.
- * Leitet den User nach der Authentifizierung zum Dashboard weiter.
- */
 export async function signInWithDiscord() {
   const { data, error } = await getSupabase().auth.signInWithOAuth({
     provider: "discord",
@@ -63,9 +52,6 @@ export async function signInWithDiscord() {
   return data;
 }
 
-/**
- * Aktuellen eingeloggten User abrufen.
- */
 export async function getCurrentUser() {
   const {
     data: { user },
@@ -75,9 +61,6 @@ export async function getCurrentUser() {
   return user;
 }
 
-/**
- * Aktuelle Session abrufen (wird für geschützte Routen benötigt).
- */
 export async function getSession() {
   const {
     data: { session },
@@ -87,20 +70,14 @@ export async function getSession() {
   return session;
 }
 
-/**
- * User ausloggen.
- */
 export async function signOut() {
   const { error } = await getSupabase().auth.signOut();
   if (error) throw error;
 }
 
-// ─── PLAYERS (Spieler-Tabelle) ────────────────────────────────────────────────
+// ─── PLAYERS ─────────────────────────────────────────────────────────────────
 
-/**
- * Spielerdaten anhand der Discord-ID laden.
- */
-export async function getPlayerByDiscordId(discordId) {
+export async function getPlayerByDiscordId(discordId: string) {
   const { data, error } = await getSupabase()
     .from("players")
     .select("*")
@@ -111,25 +88,21 @@ export async function getPlayerByDiscordId(discordId) {
   return data;
 }
 
-/**
- * Spielerdaten für eingeloggten Web-User via sichere RPC.
- */
 export async function getMyPlayer() {
   const { data, error } = await getSupabase().rpc("web_get_my_player");
   if (error) throw error;
   if (!data?.found) {
-    const err = new Error(data?.message ?? "Spieler nicht gefunden");
+    const err = new Error(data?.message ?? "Spieler nicht gefunden") as Error & {
+      reason?: string;
+    };
     err.reason = data?.reason;
     throw err;
   }
   return data;
 }
 
-// ─── VAULT (Rewards / Affiliate-Codes) ────────────────────────────────────────
+// ─── VAULT ───────────────────────────────────────────────────────────────────
 
-/**
- * Alle verfügbaren Rewards aus der Vault laden.
- */
 export async function getAvailableRewards() {
   if (!isSupabaseConfigured()) return [];
 
@@ -141,9 +114,6 @@ export async function getAvailableRewards() {
   return data ?? [];
 }
 
-/**
- * Showcase-Rewards für die Landingpage (3 Stück).
- */
 export async function getShowcaseRewards() {
   if (!isSupabaseConfigured()) return [];
 
@@ -155,10 +125,7 @@ export async function getShowcaseRewards() {
   return data ?? [];
 }
 
-/**
- * Reward atomisch einlösen via DB-RPC.
- */
-export async function purchaseReward(rewardId) {
+export async function purchaseReward(rewardId: string) {
   const { data, error } = await getSupabase().rpc("web_purchase_vault_item", {
     p_vault_id: rewardId,
   });
@@ -166,25 +133,20 @@ export async function purchaseReward(rewardId) {
   if (error) throw error;
 
   if (!data?.success) {
-    const message =
-      data?.message ??
-      ({
-        not_linked: "Account nicht verknüpft. Nutze /link im Discord.",
-        not_available: "Reward nicht mehr verfügbar.",
-        insufficient_coins: "Nicht genügend LootCoins.",
-        not_authenticated: "Bitte mit Discord einloggen.",
-      }[data?.reason] ?? "Kauf fehlgeschlagen.");
-    throw new Error(message);
+    const messages: Record<string, string> = {
+      not_linked: "Account nicht verknüpft. Nutze /link im Discord.",
+      not_available: "Reward nicht mehr verfügbar.",
+      insufficient_coins: "Nicht genügend LootCoins.",
+      not_authenticated: "Bitte mit Discord einloggen.",
+    };
+    throw new Error(messages[data?.reason as string] ?? "Kauf fehlgeschlagen.");
   }
 
   return data;
 }
 
-// ─── SERVERS (Partner-Server Showcase) ────────────────────────────────────────
+// ─── SERVERS ─────────────────────────────────────────────────────────────────
 
-/**
- * Alle aktiven Partner-Server laden.
- */
 export async function getPartnerServers() {
   if (!isSupabaseConfigured()) return [];
 
