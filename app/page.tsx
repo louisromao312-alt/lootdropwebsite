@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { getShowcaseRewards } from "@/utils/supabase";
+import HeroCoinBackground from "@/components/HeroCoinBackground";
 import {
   Zap,
   Shield,
@@ -94,9 +95,11 @@ export default async function LandingPage() {
     <div className="flex flex-col">
       {/* ── HERO ────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden">
+        <HeroCoinBackground />
+
         {/* Animated grid background */}
         <div
-          className="absolute inset-0 opacity-20"
+          className="absolute inset-0 opacity-20 z-0"
           style={{
             backgroundImage: `
               linear-gradient(oklch(0.75 0.22 142 / 15%) 1px, transparent 1px),
@@ -106,9 +109,9 @@ export default async function LandingPage() {
           }}
         />
         {/* Neon glow blob */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-96 w-96 rounded-full bg-primary/5 blur-3xl z-0" />
 
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-28 md:py-36 text-center">
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-28 md:py-36 text-center">
           <Badge
             variant="outline"
             className="mb-6 border-primary/40 text-primary bg-primary/10 px-4 py-1 text-sm"

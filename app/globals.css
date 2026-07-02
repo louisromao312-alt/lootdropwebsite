@@ -151,4 +151,171 @@
     );
     pointer-events: none;
   }
+
+  /* Hero: 3D LootCoin Animation */
+  .hero-coin-scene {
+    perspective: 1200px;
+    z-index: 0;
+  }
+
+  .hero-coin {
+    position: absolute;
+    transform-style: preserve-3d;
+  }
+
+  .hero-coin--main {
+    top: 50%;
+    right: -8%;
+    width: min(72vw, 560px);
+    height: min(72vw, 560px);
+    transform: translateY(-52%);
+    opacity: 0.55;
+  }
+
+  .hero-coin--small {
+    top: 18%;
+    left: -6%;
+    width: min(32vw, 220px);
+    height: min(32vw, 220px);
+    opacity: 0.22;
+  }
+
+  .hero-coin-spinner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    animation: hero-coin-spin 22s linear infinite;
+  }
+
+  .hero-coin--small .hero-coin-spinner {
+    animation-duration: 28s;
+    animation-direction: reverse;
+  }
+
+  .hero-coin-face {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    backface-visibility: hidden;
+    border: 3px solid oklch(0.75 0.22 142 / 55%);
+    background: radial-gradient(
+      circle at 35% 30%,
+      oklch(0.22 0.06 142) 0%,
+      oklch(0.1 0.02 142) 45%,
+      oklch(0.06 0 0) 100%
+    );
+    box-shadow:
+      inset 0 0 40px oklch(0.82 0.25 142 / 25%),
+      0 0 60px oklch(0.82 0.25 142 / 20%),
+      0 0 120px oklch(0.82 0.25 142 / 10%);
+  }
+
+  .hero-coin-face--front {
+    transform: translateZ(14px);
+  }
+
+  .hero-coin-face--back {
+    transform: rotateY(180deg) translateZ(14px);
+  }
+
+  .hero-coin-rim {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    transform: rotateY(90deg);
+    background: linear-gradient(
+      180deg,
+      oklch(0.55 0.18 142) 0%,
+      oklch(0.75 0.22 142) 50%,
+      oklch(0.45 0.14 142) 100%
+    );
+    width: 28px;
+    height: 100%;
+    left: calc(50% - 14px);
+    box-shadow: 0 0 30px oklch(0.82 0.25 142 / 35%);
+  }
+
+  .hero-coin-mark {
+    font-size: clamp(3rem, 12vw, 7rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: oklch(0.82 0.25 142);
+    text-shadow:
+      0 0 20px oklch(0.82 0.25 142 / 80%),
+      0 0 50px oklch(0.82 0.25 142 / 40%);
+  }
+
+  .hero-coin--small .hero-coin-mark {
+    font-size: clamp(2rem, 8vw, 3.5rem);
+  }
+
+  .hero-coin-sub {
+    margin-top: 0.5rem;
+    font-size: clamp(0.65rem, 2vw, 0.85rem);
+    font-weight: 600;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: oklch(0.75 0.22 142 / 70%);
+  }
+
+  .hero-coin-orbit {
+    position: absolute;
+    top: 50%;
+    right: 5%;
+    width: min(80vw, 620px);
+    height: min(80vw, 620px);
+    transform: translateY(-50%);
+    border-radius: 50%;
+    border: 1px dashed oklch(0.75 0.22 142 / 20%);
+    animation: hero-coin-orbit 30s linear infinite;
+    opacity: 0.5;
+  }
+
+  @keyframes hero-coin-spin {
+    from {
+      transform: rotateY(0deg) rotateX(18deg);
+    }
+    to {
+      transform: rotateY(360deg) rotateX(18deg);
+    }
+  }
+
+  @keyframes hero-coin-orbit {
+    from {
+      transform: translateY(-50%) rotate(0deg);
+    }
+    to {
+      transform: translateY(-50%) rotate(360deg);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .hero-coin--main {
+      right: -25%;
+      opacity: 0.35;
+    }
+    .hero-coin--small {
+      display: none;
+    }
+    .hero-coin-orbit {
+      right: -20%;
+      opacity: 0.3;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-coin-spinner,
+    .hero-coin-orbit {
+      animation: none;
+    }
+    .hero-coin-spinner {
+      transform: rotateY(25deg) rotateX(18deg);
+    }
+  }
 }
