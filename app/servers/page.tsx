@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/utils/supabase";
+import { getPartnerServers } from "@/utils/supabase";
 import {
   Server,
   Users,
@@ -16,14 +16,9 @@ import {
 // Partner-Server serverseitig laden
 async function getServers() {
   try {
-    const { data, error } = await supabase
-      .from("servers")
-      .select("*")
-      .eq("is_active", true)
-      .order("player_count", { ascending: false });
-
-    if (error || !data?.length) return FALLBACK_SERVERS;
-    return data;
+    const data = await getPartnerServers();
+    if (data?.length) return data;
+    return FALLBACK_SERVERS;
   } catch {
     return FALLBACK_SERVERS;
   }

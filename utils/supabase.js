@@ -1,16 +1,50 @@
 import { createClient } from "@supabase/supabase-js";
 
-// Supabase-Client initialisieren mit den Umgebungsvariablen
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+let supabaseClient = null;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    "Fehlende Supabase Umgebungsvariablen. Bitte .env.local prüfen."
+/**
+ * Prüft ob Supabase-Umgebungsvariablen gesetzt sind.
+ * Wichtig für Build-Zeit (Vercel) wenn Env-Vars noch fehlen.
+ */
+export function isSupabaseConfigured() {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+/**
+ * Lazy Supabase-Client – wirft erst bei Nutzung, nicht beim Import.
+ * Verhindert Build-Fehler wenn Env-Vars temporär fehlen.
+ */
+export function getSupabase() {
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      "Fehlende Supabase Umgebungsvariablen. Bitte .env.local prüfen."
+    );
+  }
+
+  if (!supabaseClient) {
+    supabaseClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    );
+  }
+
+  return supabaseClient;
+}
+
+// Rückwärtskompatibel: bestehende Imports von `supabase` funktionieren weiter
+export const supabase = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      const client = getSupabase();
+      const value = client[prop];
+      return typeof value === "function" ? value.bind(client) : value;
+    },
+  }
+);
 
 // ─── AUTH ────────────────────────────────────────────────────────────────────
 
@@ -19,7 +53,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
  * Leitet den User nach der Authentifizierung zum Dashboard weiter.
  */
 export async function signInWithDiscord() {
-  const { data, error } = await supabase.auth.signInWithOAuth({
+  const { data, error } = await getSupabase().auth.signInWithOAuth({
     provider: "discord",
     options: {
       redirectTo: `${window.location.origin}/auth/callback`,
@@ -36,7 +70,7 @@ export async function getCurrentUser() {
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser();
+  } = await getSupabase().auth.getUser();
   if (error) throw error;
   return user;
 }
@@ -48,7 +82,7 @@ export async function getSession() {
   const {
     data: { session },
     error,
-  } = await supabase.auth.getSession();
+  } = await getSupabase().auth.getSession();
   if (error) throw error;
   return session;
 }
@@ -57,7 +91,7 @@ export async function getSession() {
  * User ausloggen.
  */
 export async function signOut() {
-  const { error } = await supabase.auth.signOut();
+  const { error } = await getSupabase().auth.signOut();
   if (error) throw error;
 }
 
@@ -65,11 +99,9 @@ export async function signOut() {
 
 /**
  * Spielerdaten anhand der Discord-ID laden.
- * Gibt { loot_coins, username, avatar_url, ... } zurück.
- * @param {string} discordId - Die Discord-ID des Spielers
  */
 export async function getPlayerByDiscordId(discordId) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("players")
     .select("*")
     .eq("discord_id", discordId)
@@ -81,10 +113,9 @@ export async function getPlayerByDiscordId(discordId) {
 
 /**
  * Spielerdaten für eingeloggten Web-User via sichere RPC.
- * Nutzt Discord-ID aus dem Auth-JWT (kein manuelles Mapping nötig).
  */
 export async function getMyPlayer() {
-  const { data, error } = await supabase.rpc("web_get_my_player");
+  const { data, error } = await getSupabase().rpc("web_get_my_player");
   if (error) throw error;
   if (!data?.found) {
     const err = new Error(data?.message ?? "Spieler nicht gefunden");
@@ -97,11 +128,12 @@ export async function getMyPlayer() {
 // ─── VAULT (Rewards / Affiliate-Codes) ────────────────────────────────────────
 
 /**
- * Alle verfügbaren (nicht eingelösten) Rewards aus der Vault laden.
- * Filtert nach is_used = false.
+ * Alle verfügbaren Rewards aus der Vault laden.
  */
 export async function getAvailableRewards() {
-  const { data, error } = await supabase.rpc("web_list_available_rewards", {
+  if (!isSupabaseConfigured()) return [];
+
+  const { data, error } = await getSupabase().rpc("web_list_available_rewards", {
     p_limit: 50,
   });
 
@@ -110,11 +142,12 @@ export async function getAvailableRewards() {
 }
 
 /**
- * Drei zufällige Showcase-Rewards für die Landingpage laden.
- * Zeigt Vorschau ohne sensible Code-Daten (code wird nicht selektiert).
+ * Showcase-Rewards für die Landingpage (3 Stück).
  */
 export async function getShowcaseRewards() {
-  const { data, error } = await supabase.rpc("web_list_available_rewards", {
+  if (!isSupabaseConfigured()) return [];
+
+  const { data, error } = await getSupabase().rpc("web_list_available_rewards", {
     p_limit: 3,
   });
 
@@ -123,13 +156,10 @@ export async function getShowcaseRewards() {
 }
 
 /**
- * Reward atomisch einlösen (Coins abziehen + Vault claimen in einer Transaktion).
- * Nutzt die DB-RPC web_purchase_vault_item – sicherer als zwei separate PATCH-Requests.
- *
- * @param {string} rewardId - UUID des Rewards in der vault-Tabelle
+ * Reward atomisch einlösen via DB-RPC.
  */
 export async function purchaseReward(rewardId) {
-  const { data, error } = await supabase.rpc("web_purchase_vault_item", {
+  const { data, error } = await getSupabase().rpc("web_purchase_vault_item", {
     p_vault_id: rewardId,
   });
 
@@ -156,7 +186,9 @@ export async function purchaseReward(rewardId) {
  * Alle aktiven Partner-Server laden.
  */
 export async function getPartnerServers() {
-  const { data, error } = await supabase
+  if (!isSupabaseConfigured()) return [];
+
+  const { data, error } = await getSupabase()
     .from("servers")
     .select("*")
     .eq("is_active", true)
