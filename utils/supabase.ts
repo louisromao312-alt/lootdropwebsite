@@ -1,16 +1,34 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-
-let supabaseClient: SupabaseClient | null = null;
+import { createBrowserSupabase } from "@/lib/supabase/client";
 
 export const SUPABASE_CONFIG_ERROR =
   "Supabase nicht konfiguriert. Setze NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY (lokal: .env.local, Vercel: Environment Variables).";
 
 /** Prüft ob Supabase-Umgebungsvariablen gesetzt sind. */
 export function isSupabaseConfigured(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  return Boolean(url && key && !url.includes("deine-projekt-id"));
+}
+
+/** Anonymer Client für öffentliche Server-Abfragen (ohne Session). */
+function createAnonClient(): SupabaseClient {
+  if (!isSupabaseConfigured()) {
+    throw new Error(SUPABASE_CONFIG_ERROR);
+  }
+
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
+}
+
+/** Browser-Client mit Cookie-Session – nur in Client Components verwenden. */
+export function getSupabase(): SupabaseClient {
+  if (!isSupabaseConfigured()) {
+    throw new Error(SUPABASE_CONFIG_ERROR);
+  }
+  return createBrowserSupabase();
 }
 
 /** No-Op Auth wenn Env-Vars fehlen – verhindert Runtime-Crash in der Navbar. */
@@ -27,22 +45,6 @@ function createSafeAuth(): SupabaseClient["auth"] {
     }),
     signOut: async () => ({ error: null }),
   } as unknown as SupabaseClient["auth"];
-}
-
-/** Lazy Supabase-Client – wirft nur wenn explizit aufgerufen ohne Config. */
-export function getSupabase(): SupabaseClient {
-  if (!isSupabaseConfigured()) {
-    throw new Error(SUPABASE_CONFIG_ERROR);
-  }
-
-  if (!supabaseClient) {
-    supabaseClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-  }
-
-  return supabaseClient;
 }
 
 /** Rückwärtskompatibler Export – nutzt Safe-Auth wenn nicht konfiguriert. */
@@ -105,7 +107,7 @@ export async function signOut() {
 // ─── PLAYERS ─────────────────────────────────────────────────────────────────
 
 export async function getPlayerByDiscordId(discordId: string) {
-  const { data, error } = await getSupabase()
+  const { data, error } = await createAnonClient()
     .from("players")
     .select("*")
     .eq("discord_id", discordId)
@@ -144,9 +146,10 @@ export async function getAvailableRewards() {
 export async function getShowcaseRewards() {
   if (!isSupabaseConfigured()) return [];
 
-  const { data, error } = await getSupabase().rpc("web_list_available_rewards", {
-    p_limit: 3,
-  });
+  const { data, error } = await createAnonClient().rpc(
+    "web_list_available_rewards",
+    { p_limit: 3 }
+  );
 
   if (error) throw error;
   return data ?? [];
@@ -177,7 +180,7 @@ export async function purchaseReward(rewardId: string) {
 export async function getPartnerServers() {
   if (!isSupabaseConfigured()) return [];
 
-  const { data, error } = await getSupabase()
+  const { data, error } = await createAnonClient()
     .from("servers")
     .select("*")
     .eq("is_active", true)
