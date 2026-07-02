@@ -2,6 +2,9 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let supabaseClient: SupabaseClient | null = null;
 
+export const SUPABASE_CONFIG_ERROR =
+  "Supabase nicht konfiguriert. Setze NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY (lokal: .env.local, Vercel: Environment Variables).";
+
 /** Prüft ob Supabase-Umgebungsvariablen gesetzt sind. */
 export function isSupabaseConfigured(): boolean {
   return Boolean(
@@ -10,12 +13,26 @@ export function isSupabaseConfigured(): boolean {
   );
 }
 
-/** Lazy Supabase-Client – wirft erst bei Nutzung, nicht beim Import. */
+/** No-Op Auth wenn Env-Vars fehlen – verhindert Runtime-Crash in der Navbar. */
+function createSafeAuth(): SupabaseClient["auth"] {
+  const subscription = { id: "noop", unsubscribe: () => {} };
+
+  return {
+    getSession: async () => ({ data: { session: null }, error: null }),
+    getUser: async () => ({ data: { user: null }, error: null }),
+    onAuthStateChange: () => ({ data: { subscription } }),
+    signInWithOAuth: async () => ({
+      data: { provider: "discord", url: null },
+      error: new Error(SUPABASE_CONFIG_ERROR) as never,
+    }),
+    signOut: async () => ({ error: null }),
+  } as SupabaseClient["auth"];
+}
+
+/** Lazy Supabase-Client – wirft nur wenn explizit aufgerufen ohne Config. */
 export function getSupabase(): SupabaseClient {
   if (!isSupabaseConfigured()) {
-    throw new Error(
-      "Fehlende Supabase Umgebungsvariablen. Bitte .env.local prüfen."
-    );
+    throw new Error(SUPABASE_CONFIG_ERROR);
   }
 
   if (!supabaseClient) {
@@ -28,9 +45,14 @@ export function getSupabase(): SupabaseClient {
   return supabaseClient;
 }
 
-/** Rückwärtskompatibler Export mit korrektem TypeScript-Typ. */
+/** Rückwärtskompatibler Export – nutzt Safe-Auth wenn nicht konfiguriert. */
 export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
   get(_target, prop) {
+    if (!isSupabaseConfigured()) {
+      if (prop === "auth") return createSafeAuth();
+      throw new Error(SUPABASE_CONFIG_ERROR);
+    }
+
     const client = getSupabase();
     const value = client[prop as keyof SupabaseClient];
     return typeof value === "function"
@@ -42,6 +64,10 @@ export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
 // ─── AUTH ────────────────────────────────────────────────────────────────────
 
 export async function signInWithDiscord() {
+  if (!isSupabaseConfigured()) {
+    throw new Error(SUPABASE_CONFIG_ERROR);
+  }
+
   const { data, error } = await getSupabase().auth.signInWithOAuth({
     provider: "discord",
     options: {
@@ -71,6 +97,7 @@ export async function getSession() {
 }
 
 export async function signOut() {
+  if (!isSupabaseConfigured()) return;
   const { error } = await getSupabase().auth.signOut();
   if (error) throw error;
 }

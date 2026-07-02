@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signInWithDiscord } from "@/utils/supabase";
+import { signInWithDiscord, isSupabaseConfigured, SUPABASE_CONFIG_ERROR } from "@/utils/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +75,12 @@ export default function LoginPage() {
           </CardHeader>
 
           <CardContent className="space-y-5">
+            {!isSupabaseConfigured() && (
+              <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
+                {SUPABASE_CONFIG_ERROR}
+              </div>
+            )}
+
             {/* Error message */}
             {error && (
               <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -85,7 +91,7 @@ export default function LoginPage() {
             {/* Discord Login Button */}
             <Button
               onClick={handleDiscordLogin}
-              disabled={loading}
+              disabled={loading || !isSupabaseConfigured()}
               size="lg"
               className="w-full h-12 text-base neon-glow relative overflow-hidden group"
             >
