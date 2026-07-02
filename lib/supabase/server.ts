@@ -1,15 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseEnv } from "@/lib/supabase/config";
 
 /** Server-Client mit Cookie-Session – für Route Handlers & Server Components. */
 export async function createServerSupabase(): Promise<SupabaseClient> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error("Supabase env vars missing");
-  }
+  const { url, key } = getSupabaseEnv();
 
   const cookieStore = await cookies();
 

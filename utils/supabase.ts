@@ -1,14 +1,13 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createBrowserSupabase } from "@/lib/supabase/client";
+import { isSupabaseConfigured as checkSupabaseConfigured } from "@/lib/supabase/config";
 
 export const SUPABASE_CONFIG_ERROR =
   "Supabase nicht konfiguriert. Setze NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY (lokal: .env.local, Vercel: Environment Variables).";
 
 /** Prüft ob Supabase-Umgebungsvariablen gesetzt sind. */
 export function isSupabaseConfigured(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-  return Boolean(url && key && !url.includes("deine-projekt-id"));
+  return checkSupabaseConfigured();
 }
 
 /** Anonymer Client für öffentliche Server-Abfragen (ohne Session). */

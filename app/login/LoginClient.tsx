@@ -3,13 +3,20 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { signInWithDiscord, isSupabaseConfigured, SUPABASE_CONFIG_ERROR } from "@/utils/supabase";
+import { signInWithDiscordAction } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Zap, Shield, ArrowLeft, Loader2 } from "lucide-react";
 
-export default function LoginClient() {
+const CONFIG_ERROR =
+  "Supabase nicht konfiguriert. Setze NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY (lokal: .env.local, Vercel: Environment Variables).";
+
+type LoginClientProps = {
+  supabaseConfigured: boolean;
+};
+
+export default function LoginClient({ supabaseConfigured }: LoginClientProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const searchParams = useSearchParams();
@@ -29,7 +36,8 @@ export default function LoginClient() {
     setLoading(true);
     setError(null);
     try {
-      await signInWithDiscord();
+      const { url } = await signInWithDiscordAction();
+      window.location.href = url;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unbekannter Fehler";
       setError(`Login fehlgeschlagen: ${message}`);
@@ -82,9 +90,9 @@ export default function LoginClient() {
           </CardHeader>
 
           <CardContent className="space-y-5">
-            {!isSupabaseConfigured() && (
+            {!supabaseConfigured && (
               <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
-                {SUPABASE_CONFIG_ERROR}
+                {CONFIG_ERROR}
               </div>
             )}
 
@@ -96,7 +104,7 @@ export default function LoginClient() {
 
             <Button
               onClick={handleDiscordLogin}
-              disabled={loading || !isSupabaseConfigured()}
+              disabled={loading || !supabaseConfigured}
               size="lg"
               className="w-full h-12 text-base neon-glow relative overflow-hidden group"
             >

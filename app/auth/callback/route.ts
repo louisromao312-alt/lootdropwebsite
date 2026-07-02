@@ -4,6 +4,9 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function GET(request: NextRequest) {
   const requestUrl = request.nextUrl;
   const code = requestUrl.searchParams.get("code");
+  const authError =
+    requestUrl.searchParams.get("error_description") ??
+    requestUrl.searchParams.get("error");
   const origin = requestUrl.origin;
   const next = requestUrl.searchParams.get("next") ?? "/dashboard";
 
@@ -13,6 +16,12 @@ export async function GET(request: NextRequest) {
   if (!url || !key) {
     return NextResponse.redirect(
       `${origin}/login?error=${encodeURIComponent("Supabase env vars missing on server")}`
+    );
+  }
+
+  if (authError) {
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(authError)}`
     );
   }
 

@@ -1,8 +1,11 @@
 import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import LoginClient from "./LoginClient";
 
 export default function LoginPage() {
+  const supabaseConfigured = isSupabaseConfigured();
+
   return (
     <Suspense
       fallback={
@@ -11,7 +14,7 @@ export default function LoginPage() {
         </div>
       }
     >
-      <LoginClient />
+      <LoginClient supabaseConfigured={supabaseConfigured} />
     </Suspense>
   );
 }

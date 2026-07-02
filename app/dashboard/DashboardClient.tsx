@@ -116,29 +116,48 @@ export default function DashboardClient() {
     reward: Reward | null;
   }>({ open: false, reward: null });
 
-  // Auth-Check: Eingeloggt? Sonst → /login
+  // Auth-Check: Session aus Cookies lesen (nicht bei INITIAL_SESSION sofort redirecten)
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session?.user) {
+    let mounted = true;
+
+    const loadUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!mounted) return;
+
+      if (!user) {
         router.push("/login");
         return;
       }
-      setUser(session.user);
+
+      setUser(user);
       setLoadingAuth(false);
+    };
+
+    void loadUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+
+      if (event === "SIGNED_OUT") {
+        router.push("/login");
+        return;
+      }
+
+      if (session?.user) {
+        setUser(session.user);
+        setLoadingAuth(false);
+      }
     });
 
-    // Auth-Änderungen live verfolgen
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (!session?.user) {
-          router.push("/login");
-        } else {
-          setUser(session.user);
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   // Spielerdaten laden (Kontostand aus players-Tabelle)
