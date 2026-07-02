@@ -58,11 +58,17 @@ function Button({
 
   if (asChild && React.isValidElement(children)) {
     const child = children as React.ReactElement<{ className?: string }>
-    return React.cloneElement(child, {
-      ...props,
-      "data-slot": "button",
-      className: cn(classes, child.props.className),
-    })
+    return (
+      <ButtonPrimitive
+        data-slot="button"
+        className={classes}
+        nativeButton={false}
+        {...props}
+        render={React.cloneElement(child, {
+          className: cn(classes, child.props.className),
+        })}
+      />
+    )
   }
 
   return (
