@@ -1,25 +1,32 @@
 import type { User } from "@supabase/supabase-js";
 
+/** Fallback-Admins wenn ENV auf Vercel noch nicht gesetzt ist (Founder). */
+const DEFAULT_ADMIN_DISCORD_USERNAMES = ["louisplot"];
+const DEFAULT_ADMIN_EMAILS = ["louisromao312@gmail.com"];
+
 /**
  * Admin-Zugang über ADMIN_EMAILS, ADMIN_DISCORD_USERNAMES, ADMIN_DISCORD_IDS (server-only).
  */
 export function getAdminEmails(): string[] {
-  const raw = process.env.ADMIN_EMAILS ?? "";
-  return raw
+  const fromEnv = (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean);
+
+  return [...new Set([...fromEnv, ...DEFAULT_ADMIN_EMAILS])];
 }
 
 export function getAdminDiscordUsernames(): string[] {
-  const raw =
+  const fromEnv = (
     process.env.ADMIN_DISCORD_USERNAMES ??
     process.env.NEXT_PUBLIC_ADMIN_DISCORD_USERNAMES ??
-    "";
-  return raw
+    ""
+  )
     .split(",")
     .map((name) => name.trim().toLowerCase())
     .filter(Boolean);
+
+  return [...new Set([...fromEnv, ...DEFAULT_ADMIN_DISCORD_USERNAMES])];
 }
 
 export function getAdminDiscordIds(): string[] {
@@ -29,9 +36,7 @@ export function getAdminDiscordIds(): string[] {
 
 export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
-  const admins = getAdminEmails();
-  if (admins.length === 0) return false;
-  return admins.includes(email.trim().toLowerCase());
+  return getAdminEmails().includes(email.trim().toLowerCase());
 }
 
 /** Alle erkennbaren Discord-Identitäten aus OAuth-Metadaten sammeln. */
@@ -96,7 +101,7 @@ export function isAdminUser(user: User | null | undefined): boolean {
   const adminIds = getAdminDiscordIds();
   const candidates = getDiscordIdentityCandidates(user);
 
-  if (adminUsernames.length > 0 && adminUsernames.some((name) => candidates.includes(name))) {
+  if (adminUsernames.some((name) => candidates.includes(name))) {
     return true;
   }
 
@@ -107,16 +112,17 @@ export function isAdminUser(user: User | null | undefined): boolean {
   return false;
 }
 
-/** Client-seitige Admin-UI-Prüfung (öffentliche Usernamen-Liste). */
+/** Client-seitige Admin-UI-Prüfung. */
 export function isAdminUserClient(user: User | null | undefined): boolean {
   if (!user) return false;
 
-  const publicAdmins = (process.env.NEXT_PUBLIC_ADMIN_DISCORD_USERNAMES ?? "")
+  const publicAdmins = (
+    process.env.NEXT_PUBLIC_ADMIN_DISCORD_USERNAMES ??
+    DEFAULT_ADMIN_DISCORD_USERNAMES.join(",")
+  )
     .split(",")
     .map((name) => name.trim().toLowerCase())
     .filter(Boolean);
-
-  if (publicAdmins.length === 0) return false;
 
   const candidates = getDiscordIdentityCandidates(user);
   return publicAdmins.some((name) => candidates.includes(name));
