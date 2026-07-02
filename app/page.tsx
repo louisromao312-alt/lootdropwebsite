@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { supabase } from "@/utils/supabase";
+import { getShowcaseRewards } from "@/utils/supabase";
 import {
   Zap,
   Shield,
@@ -16,17 +16,11 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-// Showcase-Rewards serverseitig laden (3 Beispiel-Rewards)
-async function getShowcaseRewards() {
+async function getShowcaseRewardsWithFallback() {
   try {
-    const { data, error } = await supabase
-      .from("vault")
-      .select("id, title, description, cost_coins, reward_type")
-      .eq("is_used", false)
-      .limit(3);
-
-    if (error || !data?.length) return FALLBACK_REWARDS;
-    return data;
+    const data = await getShowcaseRewards();
+    if (data?.length) return data;
+    return FALLBACK_REWARDS;
   } catch {
     return FALLBACK_REWARDS;
   }
@@ -94,7 +88,7 @@ const FEATURES = [
 ];
 
 export default async function LandingPage() {
-  const showcaseRewards = await getShowcaseRewards();
+  const showcaseRewards = await getShowcaseRewardsWithFallback();
 
   return (
     <div className="flex flex-col">

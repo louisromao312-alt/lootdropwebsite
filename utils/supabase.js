@@ -79,6 +79,21 @@ export async function getPlayerByDiscordId(discordId) {
   return data;
 }
 
+/**
+ * Spielerdaten für eingeloggten Web-User via sichere RPC.
+ * Nutzt Discord-ID aus dem Auth-JWT (kein manuelles Mapping nötig).
+ */
+export async function getMyPlayer() {
+  const { data, error } = await supabase.rpc("web_get_my_player");
+  if (error) throw error;
+  if (!data?.found) {
+    const err = new Error(data?.message ?? "Spieler nicht gefunden");
+    err.reason = data?.reason;
+    throw err;
+  }
+  return data;
+}
+
 // ─── VAULT (Rewards / Affiliate-Codes) ────────────────────────────────────────
 
 /**
@@ -86,14 +101,12 @@ export async function getPlayerByDiscordId(discordId) {
  * Filtert nach is_used = false.
  */
 export async function getAvailableRewards() {
-  const { data, error } = await supabase
-    .from("vault")
-    .select("*")
-    .eq("is_used", false)
-    .order("created_at", { ascending: false });
+  const { data, error } = await supabase.rpc("web_list_available_rewards", {
+    p_limit: 50,
+  });
 
   if (error) throw error;
-  return data;
+  return data ?? [];
 }
 
 /**
@@ -101,62 +114,39 @@ export async function getAvailableRewards() {
  * Zeigt Vorschau ohne sensible Code-Daten (code wird nicht selektiert).
  */
 export async function getShowcaseRewards() {
-  const { data, error } = await supabase
-    .from("vault")
-    .select("id, title, description, cost_coins, reward_type, icon")
-    .eq("is_used", false)
-    .limit(3);
+  const { data, error } = await supabase.rpc("web_list_available_rewards", {
+    p_limit: 3,
+  });
 
   if (error) throw error;
-  return data;
+  return data ?? [];
 }
 
 /**
- * Einen Reward einlösen.
- * Setzt is_used = true und speichert die Discord-ID des Einlösers.
+ * Reward atomisch einlösen (Coins abziehen + Vault claimen in einer Transaktion).
+ * Nutzt die DB-RPC web_purchase_vault_item – sicherer als zwei separate PATCH-Requests.
  *
  * @param {string} rewardId - UUID des Rewards in der vault-Tabelle
- * @param {string} discordId - Discord-ID des einlösenden Users
  */
-export async function claimReward(rewardId, discordId) {
-  const { data, error } = await supabase
-    .from("vault")
-    .update({
-      is_used: true,
-      claimed_by: discordId,
-      claimed_at: new Date().toISOString(),
-    })
-    .eq("id", rewardId)
-    .eq("is_used", false) // Race-Condition verhindern: nur wenn noch nicht eingelöst
-    .select()
-    .single();
+export async function purchaseReward(rewardId) {
+  const { data, error } = await supabase.rpc("web_purchase_vault_item", {
+    p_vault_id: rewardId,
+  });
 
   if (error) throw error;
-  return data;
-}
 
-/**
- * LootCoins eines Spielers nach dem Einlösen abziehen.
- *
- * @param {string} discordId - Discord-ID des Spielers
- * @param {number} amount - Anzahl der abzuziehenden Coins
- */
-export async function deductCoins(discordId, amount) {
-  // Aktuellen Kontostand abrufen
-  const player = await getPlayerByDiscordId(discordId);
-
-  if (player.loot_coins < amount) {
-    throw new Error("Nicht genügend LootCoins auf dem Konto.");
+  if (!data?.success) {
+    const message =
+      data?.message ??
+      ({
+        not_linked: "Account nicht verknüpft. Nutze /link im Discord.",
+        not_available: "Reward nicht mehr verfügbar.",
+        insufficient_coins: "Nicht genügend LootCoins.",
+        not_authenticated: "Bitte mit Discord einloggen.",
+      }[data?.reason] ?? "Kauf fehlgeschlagen.");
+    throw new Error(message);
   }
 
-  const { data, error } = await supabase
-    .from("players")
-    .update({ loot_coins: player.loot_coins - amount })
-    .eq("discord_id", discordId)
-    .select()
-    .single();
-
-  if (error) throw error;
   return data;
 }
 

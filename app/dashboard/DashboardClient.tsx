@@ -6,9 +6,8 @@ import Link from "next/link";
 import {
   supabase,
   getAvailableRewards,
-  getPlayerByDiscordId,
-  claimReward,
-  deductCoins,
+  getMyPlayer,
+  purchaseReward,
 } from "@/utils/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -143,14 +142,16 @@ export default function DashboardClient() {
   }, [router]);
 
   // Spielerdaten laden (Kontostand aus players-Tabelle)
-  const loadPlayerData = useCallback(async (u: User) => {
+  const loadPlayerData = useCallback(async () => {
     try {
-      const discordId =
-        u.user_metadata?.provider_id ?? u.user_metadata?.sub ?? u.id;
-      const data = await getPlayerByDiscordId(discordId);
-      setPlayerData(data);
+      const data = await getMyPlayer();
+      setPlayerData({
+        loot_coins: data.loot_coins,
+        total_earned: data.total_earned,
+        username: data.username,
+      });
     } catch {
-      // Spieler noch nicht in DB — Demo-Wert anzeigen
+      // Spieler noch nicht verknüpft – Demo-Wert anzeigen
       setPlayerData({ loot_coins: 12500, total_earned: 45000 });
     }
   }, []);
@@ -170,7 +171,7 @@ export default function DashboardClient() {
 
   useEffect(() => {
     if (user) {
-      loadPlayerData(user);
+      loadPlayerData();
       loadRewards();
     }
   }, [user, loadPlayerData, loadRewards]);
@@ -190,20 +191,28 @@ export default function DashboardClient() {
     setClaimingId(reward.id);
 
     try {
-      const discordId =
-        user.user_metadata?.provider_id ?? user.user_metadata?.sub ?? user.id;
+      // Atomischer Kauf via DB-RPC (Coins + Vault in einer Transaktion)
+      const result = await purchaseReward(reward.id);
 
-      // 1. Reward in Vault als eingelöst markieren (is_used = true, claimed_by = discord_id)
-      const claimedReward = await claimReward(reward.id, discordId);
+      setPlayerData((prev) =>
+        prev
+          ? {
+              ...prev,
+              loot_coins: result.new_balance ?? prev.loot_coins - reward.cost_coins,
+            }
+          : prev
+      );
 
-      // 2. Coins vom Kontostand abziehen
-      const updatedPlayer = await deductCoins(discordId, reward.cost_coins);
-      setPlayerData(updatedPlayer);
+      setSuccessModal({
+        open: true,
+        reward: {
+          ...reward,
+          title: result.title ?? reward.title,
+          code: result.code ?? result.content,
+          link: result.link,
+        },
+      });
 
-      // 3. Erfolgs-Modal mit Reward-Code anzeigen
-      setSuccessModal({ open: true, reward: claimedReward ?? reward });
-
-      // Reward aus Liste entfernen
       setRewards((prev) => prev.filter((r) => r.id !== reward.id));
     } catch (err: unknown) {
       // Demo-Modus: Coins lokal abziehen
@@ -272,7 +281,10 @@ export default function DashboardClient() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => user && loadPlayerData(user) && loadRewards()}
+          onClick={() => {
+            void loadPlayerData();
+            void loadRewards();
+          }}
           className="border-border/50 hover:border-primary/40 self-start sm:self-auto"
         >
           <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
