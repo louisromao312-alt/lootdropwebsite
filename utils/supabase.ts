@@ -23,10 +23,10 @@ function createSafeAuth(): SupabaseClient["auth"] {
     onAuthStateChange: () => ({ data: { subscription } }),
     signInWithOAuth: async () => ({
       data: { provider: "discord", url: null },
-      error: new Error(SUPABASE_CONFIG_ERROR) as never,
+      error: new Error(SUPABASE_CONFIG_ERROR),
     }),
     signOut: async () => ({ error: null }),
-  } as SupabaseClient["auth"];
+  } as unknown as SupabaseClient["auth"];
 }
 
 /** Lazy Supabase-Client – wirft nur wenn explizit aufgerufen ohne Config. */
