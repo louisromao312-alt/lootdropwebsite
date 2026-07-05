@@ -4,34 +4,28 @@ import type { User } from "@supabase/supabase-js";
 const DEFAULT_ADMIN_DISCORD_USERNAMES = ["louisplot"];
 const DEFAULT_ADMIN_EMAILS = ["louisromao312@gmail.com"];
 
-/**
- * Admin-Zugang über ADMIN_EMAILS, ADMIN_DISCORD_USERNAMES, ADMIN_DISCORD_IDS (server-only).
- */
-export function getAdminEmails(): string[] {
-  const fromEnv = (process.env.ADMIN_EMAILS ?? "")
+function parseList(raw: string | undefined): string[] {
+  if (!raw?.trim()) return [];
+  return raw
     .split(",")
-    .map((email) => email.trim().toLowerCase())
+    .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
+}
 
-  return [...new Set([...fromEnv, ...DEFAULT_ADMIN_EMAILS])];
+export function getAdminEmails(): string[] {
+  return [...new Set([...parseList(process.env.ADMIN_EMAILS), ...DEFAULT_ADMIN_EMAILS])];
 }
 
 export function getAdminDiscordUsernames(): string[] {
-  const fromEnv = (
-    process.env.ADMIN_DISCORD_USERNAMES ??
-    process.env.NEXT_PUBLIC_ADMIN_DISCORD_USERNAMES ??
-    ""
-  )
-    .split(",")
-    .map((name) => name.trim().toLowerCase())
-    .filter(Boolean);
-
+  const fromEnv = [
+    ...parseList(process.env.ADMIN_DISCORD_USERNAMES),
+    ...parseList(process.env.NEXT_PUBLIC_ADMIN_DISCORD_USERNAMES),
+  ];
   return [...new Set([...fromEnv, ...DEFAULT_ADMIN_DISCORD_USERNAMES])];
 }
 
 export function getAdminDiscordIds(): string[] {
-  const raw = process.env.ADMIN_DISCORD_IDS ?? "";
-  return raw.split(",").map((id) => id.trim()).filter(Boolean);
+  return parseList(process.env.ADMIN_DISCORD_IDS);
 }
 
 export function isAdminEmail(email: string | null | undefined): boolean {
@@ -39,55 +33,48 @@ export function isAdminEmail(email: string | null | undefined): boolean {
   return getAdminEmails().includes(email.trim().toLowerCase());
 }
 
+/** Anzeigename wie in der Navbar. */
+export function getUserDisplayName(user: User): string {
+  return (
+    user.user_metadata?.full_name ??
+    user.user_metadata?.name ??
+    user.user_metadata?.user_name ??
+    user.email ??
+    ""
+  );
+}
+
+function collectStrings(value: unknown, out: Set<string>) {
+  if (typeof value === "string" && value.trim()) {
+    out.add(value.trim().toLowerCase());
+    return;
+  }
+  if (value && typeof value === "object") {
+    for (const nested of Object.values(value)) {
+      collectStrings(nested, out);
+    }
+  }
+}
+
 /** Alle erkennbaren Discord-Identitäten aus OAuth-Metadaten sammeln. */
 export function getDiscordIdentityCandidates(user: User): string[] {
   const candidates = new Set<string>();
-  const meta = user.user_metadata ?? {};
 
-  const metaFields = [
-    meta.user_name,
-    meta.preferred_username,
-    meta.full_name,
-    meta.name,
-    meta.custom_claims?.global_name,
-    meta.custom_claims?.username,
-    meta.custom_claims?.name,
-    user.email,
-  ];
-
-  for (const value of metaFields) {
-    if (typeof value === "string" && value.trim()) {
-      candidates.add(value.trim().toLowerCase());
-    }
-  }
+  collectStrings(user.user_metadata, candidates);
+  if (user.email) candidates.add(user.email.trim().toLowerCase());
 
   for (const identity of user.identities ?? []) {
     if (identity.provider !== "discord") continue;
-
-    const data = identity.identity_data ?? {};
-    const identityFields = [
-      data.user_name,
-      data.username,
-      data.name,
-      data.full_name,
-      data.global_name,
-      data.preferred_username,
-      data.sub,
-      data.provider_id,
-      identity.id,
-    ];
-
-    for (const value of identityFields) {
-      if (value != null && String(value).trim()) {
-        candidates.add(String(value).trim().toLowerCase());
-      }
-    }
+    collectStrings(identity.identity_data, candidates);
+    if (identity.id) candidates.add(identity.id.toLowerCase());
   }
+
+  const display = getUserDisplayName(user).trim().toLowerCase();
+  if (display) candidates.add(display);
 
   return [...candidates];
 }
 
-/** Erster Anzeigename für UI. */
 export function getDiscordUsername(user: User): string | null {
   return getDiscordIdentityCandidates(user)[0] ?? null;
 }
@@ -112,18 +99,7 @@ export function isAdminUser(user: User | null | undefined): boolean {
   return false;
 }
 
-/** Client-seitige Admin-UI-Prüfung. */
+/** @deprecated Nutze isAdminUser – gleiche Logik für Client und Server. */
 export function isAdminUserClient(user: User | null | undefined): boolean {
-  if (!user) return false;
-
-  const publicAdmins = (
-    process.env.NEXT_PUBLIC_ADMIN_DISCORD_USERNAMES ??
-    DEFAULT_ADMIN_DISCORD_USERNAMES.join(",")
-  )
-    .split(",")
-    .map((name) => name.trim().toLowerCase())
-    .filter(Boolean);
-
-  const candidates = getDiscordIdentityCandidates(user);
-  return publicAdmins.some((name) => candidates.includes(name));
+  return isAdminUser(user);
 }

@@ -4,20 +4,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/utils/supabase";
 import {
-  isAdminUserClient,
+  isAdminUser,
   getDiscordIdentityCandidates,
   getAdminDiscordUsernames,
   getDiscordUsername,
 } from "@/lib/admin";
-import { checkAdminAccess } from "./actions";
 import AdminDashboardClient from "./AdminDashboardClient";
 import AdminAccessDenied from "./AdminAccessDenied";
 import { Loader2 } from "lucide-react";
 
-/**
- * Client-Fallback: Prüft Admin-Zugang über Browser-Session + Server Action.
- * Nötig wenn die Server-Session auf Vercel beim ersten Render noch fehlt.
- */
 export default function AdminDashboardGate() {
   const router = useRouter();
   const [state, setState] = useState<"loading" | "admin" | "denied" | "login">("loading");
@@ -28,26 +23,19 @@ export default function AdminDashboardGate() {
     const verify = async () => {
       const {
         data: { user },
+        error,
       } = await supabase.auth.getUser();
 
-      if (!user) {
+      if (error || !user) {
         setState("login");
         router.replace("/login");
         return;
       }
 
-      setDetectedIdentities(getDiscordIdentityCandidates(user));
+      const identities = getDiscordIdentityCandidates(user);
+      setDetectedIdentities(identities);
 
-      let isAdmin = isAdminUserClient(user);
-
-      try {
-        const { isAdmin: serverAdmin } = await checkAdminAccess();
-        isAdmin = isAdmin || serverAdmin;
-      } catch {
-        // Server-Action fehlgeschlagen – Client-Check reicht
-      }
-
-      if (isAdmin) {
+      if (isAdminUser(user)) {
         setAdminLabel(getDiscordUsername(user) ?? user.email ?? "Admin");
         setState("admin");
         return;

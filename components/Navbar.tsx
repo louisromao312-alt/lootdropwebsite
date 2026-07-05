@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { supabase, signOut } from "@/utils/supabase";
-import { isAdminUserClient } from "@/lib/admin";
-import { checkAdminAccess } from "@/app/admin/dashboard/actions";
+import { isAdminUser } from "@/lib/admin";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -43,24 +42,8 @@ export default function Navbar({ initialIsAdmin = false }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
-  const resolveAdminStatus = async (currentUser: User | null) => {
-    if (!currentUser) {
-      setIsAdmin(false);
-      return;
-    }
-
-    // Client-Check (NEXT_PUBLIC / next.config env)
-    let admin = initialIsAdmin || isAdminUserClient(currentUser);
-
-    // Server-Check (ADMIN_DISCORD_USERNAMES zur Laufzeit – wichtig für Vercel)
-    try {
-      const { isAdmin: serverAdmin } = await checkAdminAccess();
-      admin = admin || serverAdmin;
-    } catch {
-      // Session evtl. noch nicht bereit
-    }
-
-    setIsAdmin(admin);
+  const resolveAdminStatus = (currentUser: User | null) => {
+    setIsAdmin(currentUser ? isAdminUser(currentUser) || initialIsAdmin : false);
   };
 
   useEffect(() => {
@@ -69,7 +52,7 @@ export default function Navbar({ initialIsAdmin = false }: NavbarProps) {
         data: { user },
       } = await supabase.auth.getUser();
       setUser(user ?? null);
-      await resolveAdminStatus(user ?? null);
+      resolveAdminStatus(user ?? null);
     };
 
     void loadUser();
@@ -84,7 +67,7 @@ export default function Navbar({ initialIsAdmin = false }: NavbarProps) {
       }
       if (session?.user) {
         setUser(session.user);
-        void resolveAdminStatus(session.user);
+        resolveAdminStatus(session.user);
       }
     });
 
