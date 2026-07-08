@@ -120,6 +120,13 @@ export default async function ServersPage() {
             Alle Minecraft-Server, die das LootDrop-Plugin aktiv nutzen. Spiele
             dort und verdiene automatisch LootCoins für deinen Account.
           </p>
+          <p className="text-sm text-muted-foreground/80 max-w-xl mt-2">
+            Server-Besitzer: Bindet Spieler und erhaltet eine anteilige
+            Gewinnausschüttung pro aktivem Spieler.{" "}
+            <Link href="/partner" className="font-medium text-foreground hover:text-primary underline underline-offset-2">
+              Mehr erfahren
+            </Link>
+          </p>
         </div>
 
         {/* CTA: Server anmelden */}

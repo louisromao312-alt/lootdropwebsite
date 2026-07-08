@@ -145,6 +145,13 @@ export default function HomePage() {
             <div>
               <div className="pill mb-4 w-fit">Jetzt verfügbar</div>
               <h2 className="headline-lg">Partner<br /><span className="accent-text">Server</span></h2>
+              <p className="text-muted-foreground mt-4 max-w-lg">
+                Spieler verdienen LootCoins — Server-Besitzer binden ihre Community und
+                profitieren anteilig vom Umsatz.{" "}
+                <Link href="/partner" className="font-semibold text-foreground underline underline-offset-2 hover:text-primary">
+                  Partner werden →
+                </Link>
+              </p>
             </div>
             <Link href="/servers" className="btn-cta-outline text-sm py-2.5 px-5 self-start sm:self-auto">
               Alle Server →
