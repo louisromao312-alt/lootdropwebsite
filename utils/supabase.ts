@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { isSupabaseConfigured as checkSupabaseConfigured } from "@/lib/supabase/config";
+import type { ShowcaseReward } from "@/lib/rewards";
 
 export const SUPABASE_CONFIG_ERROR =
   "Supabase nicht konfiguriert. Setze NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY (lokal: .env.local, Vercel: Environment Variables).";
@@ -131,7 +132,7 @@ export async function getMyPlayer() {
 
 // ─── VAULT ───────────────────────────────────────────────────────────────────
 
-export async function getAvailableRewards() {
+export async function getAvailableRewards(): Promise<ShowcaseReward[]> {
   if (!isSupabaseConfigured()) return [];
 
   const { data, error } = await getSupabase().rpc("web_list_available_rewards", {
@@ -139,10 +140,10 @@ export async function getAvailableRewards() {
   });
 
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as ShowcaseReward[];
 }
 
-export async function getShowcaseRewards() {
+export async function getShowcaseRewards(): Promise<ShowcaseReward[]> {
   if (!isSupabaseConfigured()) return [];
 
   const { data, error } = await createAnonClient().rpc(
@@ -151,7 +152,7 @@ export async function getShowcaseRewards() {
   );
 
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as ShowcaseReward[];
 }
 
 export async function purchaseReward(rewardId: string) {

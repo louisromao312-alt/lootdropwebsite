@@ -1,25 +1,8 @@
 import Link from "next/link";
-import { getShowcaseRewards } from "@/utils/supabase";
 import FloatingCoins from "@/components/FloatingCoins";
+import RewardCard from "@/components/RewardCard";
+import { DIRECT_REWARDS, RAFFLE_REWARDS, type ShowcaseReward } from "@/lib/rewards";
 import { ArrowRight, Check, Star, Zap, Users, Trophy } from "lucide-react";
-
-async function getRewards() {
-  try {
-    const data = await getShowcaseRewards();
-    return data?.length ? data : FALLBACK_REWARDS;
-  } catch {
-    return FALLBACK_REWARDS;
-  }
-}
-
-const FALLBACK_REWARDS = [
-  { id: "1", title: "Discord Nitro Classic", description: "1 Monat Nitro für dein Konto.", cost_coins: 5000, reward_type: "digital" },
-  { id: "2", title: "Steam Guthaben 10€", description: "10€ Steam-Wallet Guthaben.", cost_coins: 8000, reward_type: "digital" },
-  { id: "3", title: "Amazon Gift Card 15€", description: "Digitale Amazon-Geschenkkarte.", cost_coins: 12000, reward_type: "digital" },
-  { id: "4", title: "VIP Server-Rang", description: "Permanenter VIP-Rang auf einem Partner-Server.", cost_coins: 3000, reward_type: "in-game" },
-  { id: "5", title: "LootDrop Mystery Box", description: "Überraschungs-Belohnung aus unserem Pool.", cost_coins: 2000, reward_type: "mystery" },
-  { id: "6", title: "Minecraft Java Edition", description: "Vollständiger Key für einen Freund.", cost_coins: 15000, reward_type: "digital" },
-];
 
 const PARTNER_SERVERS = [
   { name: "CraftLand SMP",   players: "2.4K", tag: "Survival",   color: "bg-emerald-50  border-emerald-200" },
@@ -46,7 +29,7 @@ const HOW_IT_WORKS = [
   {
     step: "03",
     title: "Löse echte Rewards ein",
-    desc: "Tausche deine LootCoins gegen Steam-Guthaben, Discord Nitro, Amazon Gift Cards und mehr.",
+    desc: "Kaufe Guthaben & Rabatte direkt — oder günstige Verlosungs-Tickets für begehrte Hauptpreise.",
     icon: Trophy,
   },
 ];
@@ -58,9 +41,7 @@ const STATS = [
   { value: "4.9★",   label: "Bewertung" },
 ];
 
-export default async function HomePage() {
-  const rewards = await getRewards();
-
+export default function HomePage() {
   return (
     <div className="bg-background">
 
@@ -186,13 +167,20 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── REWARDS ──────────────────────────────────────────────────── */}
+      {/* ── REWARDS: DIREKT EINLÖSEN ─────────────────────────────────── */}
       <section className="section-pad">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-12 gap-4">
             <div>
-              <div className="pill mb-4 w-fit">Reward Shop</div>
-              <h2 className="headline-lg">Deine<br /><span className="accent-text">Belohnungen</span></h2>
+              <div className="pill mb-4 w-fit">Direkt einlösen</div>
+              <h2 className="headline-lg">
+                Guthaben &<br />
+                <span className="accent-text">Rabatte</span>
+              </h2>
+              <p className="text-muted-foreground mt-4 max-w-lg">
+                Tausche LootCoins 1:1 gegen echtes Guthaben, Rabatte und In-Game-Vorteile —
+                sofort auf dein Konto.
+              </p>
             </div>
             <Link href="/login" className="btn-cta text-sm py-2.5 px-5 self-start sm:self-auto">
               Shop öffnen →
@@ -200,27 +188,45 @@ export default async function HomePage() {
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {rewards.map((r) => (
-              <div key={r.id} className="card-soft p-6 flex flex-col gap-3 hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-black text-base uppercase tracking-tight leading-tight">{r.title}</h3>
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary shrink-0">
-                    {r.reward_type}
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed flex-1">{r.description}</p>
-                <div className="flex items-center justify-between pt-2 border-t border-border">
-                  <span className="font-black text-lg text-foreground">
-                    {r.cost_coins.toLocaleString("de-DE")}
-                    <span className="text-sm font-medium text-muted-foreground ml-1">LC</span>
-                  </span>
-                  <Link href="/login" className="btn-green text-xs py-2 px-4">
-                    Einlösen
-                  </Link>
-                </div>
-              </div>
+            {DIRECT_REWARDS.map((reward: ShowcaseReward) => (
+              <RewardCard key={reward.id} reward={reward} />
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── REWARDS: VERLOSUNGEN ─────────────────────────────────────── */}
+      <section className="section-pad bg-[oklch(0.96_0_0)]">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-12 gap-4">
+            <div>
+              <div className="pill mb-4 w-fit border-amber-200 bg-amber-50 text-amber-800">
+                Verlosungs-Tickets
+              </div>
+              <h2 className="headline-lg">
+                Große Preise.<br />
+                <span className="accent-text">Kleine Einsätze.</span>
+              </h2>
+              <p className="text-muted-foreground mt-4 max-w-lg">
+                Kaufe Tickets für begehrte Verlosungen — z.&nbsp;B. einen 25€ Steam-Gutschein
+                für nur 500 LC pro Ticket. Mehr Tickets = höhere Gewinnchance.
+              </p>
+            </div>
+            <Link href="/login" className="btn-cta text-sm py-2.5 px-5 self-start sm:self-auto">
+              Tickets kaufen →
+            </Link>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {RAFFLE_REWARDS.map((reward: ShowcaseReward) => (
+              <RewardCard key={reward.id} reward={reward} />
+            ))}
+          </div>
+
+          <p className="text-center text-sm text-muted-foreground mt-10 max-w-2xl mx-auto">
+            Verlosungen werden live per Zufallsgenerator gezogen. Gewinner werden per Discord
+            benachrichtigt. Tickets sind nicht erstattungsfähig.
+          </p>
         </div>
       </section>
 

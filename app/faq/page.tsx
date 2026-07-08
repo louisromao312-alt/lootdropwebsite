@@ -13,7 +13,7 @@ const FAQS = [
   },
   {
     q: "Welche Belohnungen gibt es?",
-    a: "Im Reward-Shop findest du u.a. Steam-Guthaben, Discord Nitro, Amazon Gift Cards, In-Game-Ränge auf Partner-Servern und LootDrop Mystery Boxes. Das Sortiment wird regelmäßig erweitert.",
+    a: "Im Reward-Shop gibt es zwei Kategorien: Direkt einlösbare Rewards (Steam-Guthaben, Amazon Gift Cards, Rabatte, In-Game-Ränge) und Verlosungs-Tickets. Bei Verlosungen kaufst du günstige Tickets für die Chance auf begehrte Hauptpreise — z. B. einen 25€ Steam-Gutschein für nur 500 LC pro Ticket.",
   },
   {
     q: "Kostet die Nutzung etwas?",
@@ -22,6 +22,10 @@ const FAQS = [
   {
     q: "Wie lange sind meine LootCoins gültig?",
     a: "LootCoins verfallen nicht, solange dein Account aktiv ist (mindestens eine Aktivität in den letzten 12 Monaten).",
+  },
+  {
+    q: "Wie funktionieren Verlosungs-Tickets?",
+    a: "Du kaufst Tickets mit LootCoins für eine aktive Verlosung. Jeder Ticket-Kauf erhöht deine Gewinnchance. Nach der Ziehung wird ein Gewinner per Zufallsgenerator ermittelt und per Discord benachrichtigt. Tickets sind nicht erstattungsfähig — du kaufst eine Chance, nicht den garantierten Preis.",
   },
   {
     q: "Kann ich LootCoins verkaufen oder übertragen?",

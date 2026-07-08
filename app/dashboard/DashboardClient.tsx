@@ -28,21 +28,20 @@ import {
   ShoppingBag,
   CheckCircle2,
   Loader2,
-  AlertCircle,
   Copy,
   ExternalLink,
   RefreshCw,
+  Ticket,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
+import RewardCard from "@/components/RewardCard";
+import {
+  ALL_SHOWCASE_REWARDS,
+  type ShowcaseReward,
+} from "@/lib/rewards";
 
-// Typen
-interface Reward {
-  id: string;
-  title: string;
-  description: string;
-  cost_coins: number;
-  reward_type: string;
+interface Reward extends ShowcaseReward {
   code?: string;
   link?: string;
 }
@@ -53,51 +52,13 @@ interface PlayerData {
   total_earned?: number;
 }
 
-// Fallback-Rewards für Demo-Modus (ohne Supabase-Connection)
-const DEMO_REWARDS: Reward[] = [
-  {
-    id: "demo-1",
-    title: "Discord Nitro Classic",
-    description: "1 Monat Discord Nitro Classic. Gib den Code direkt in Discord ein.",
-    cost_coins: 5000,
-    reward_type: "digital",
-  },
-  {
-    id: "demo-2",
-    title: "Steam Guthaben 10€",
-    description: "10€ Steam-Wallet Guthaben als digitaler Einlösecode.",
-    cost_coins: 8000,
-    reward_type: "digital",
-  },
-  {
-    id: "demo-3",
-    title: "VIP Server-Rang",
-    description: "Permanenter VIP-Rang auf CraftLand SMP (30 Tage).",
-    cost_coins: 3000,
-    reward_type: "in-game",
-  },
-  {
-    id: "demo-4",
-    title: "Minecraft Java Edition",
-    description: "Ein vollständiger Minecraft Java Edition Key für einen Freund.",
-    cost_coins: 15000,
-    reward_type: "digital",
-  },
-  {
-    id: "demo-5",
-    title: "LootDrop Mystery Box",
-    description: "Eine zufällige Überraschungs-Belohnung aus unserem Pool.",
-    cost_coins: 2000,
-    reward_type: "mystery",
-  },
-  {
-    id: "demo-6",
-    title: "Exclusive Skin Pack",
-    description: "Exklusives LootDrop-gebrandetes Minecraft Skin Pack.",
-    cost_coins: 1500,
-    reward_type: "in-game",
-  },
-];
+function isDemoReward(id: string) {
+  return id.startsWith("d") || id.startsWith("r") || id.startsWith("demo-");
+}
+
+function isRaffleReward(reward: Reward) {
+  return reward.category === "raffle";
+}
 
 export default function DashboardClient() {
   const router = useRouter();
@@ -180,9 +141,18 @@ export default function DashboardClient() {
     setLoadingRewards(true);
     try {
       const data = await getAvailableRewards();
-      setRewards(data?.length ? data : DEMO_REWARDS);
+      if (data?.length) {
+        setRewards(
+          data.map((r: Reward) => ({
+            ...r,
+            category: r.category ?? "direct",
+          }))
+        );
+      } else {
+        setRewards(ALL_SHOWCASE_REWARDS);
+      }
     } catch {
-      setRewards(DEMO_REWARDS);
+      setRewards(ALL_SHOWCASE_REWARDS);
     } finally {
       setLoadingRewards(false);
     }
@@ -227,21 +197,28 @@ export default function DashboardClient() {
         reward: {
           ...reward,
           title: result.title ?? reward.title,
-          code: result.code ?? result.content,
+          code: isRaffleReward(reward) ? undefined : (result.code ?? result.content),
           link: result.link,
         },
       });
 
-      setRewards((prev) => prev.filter((r) => r.id !== reward.id));
+      if (!isRaffleReward(reward)) {
+        setRewards((prev) => prev.filter((r) => r.id !== reward.id));
+      }
     } catch (err: unknown) {
-      // Demo-Modus: Coins lokal abziehen
-      const isDemoReward = reward.id.startsWith("demo-");
-      if (isDemoReward) {
+      if (isDemoReward(reward.id)) {
         setPlayerData((prev) =>
           prev ? { ...prev, loot_coins: prev.loot_coins - reward.cost_coins } : prev
         );
-        setSuccessModal({ open: true, reward: { ...reward, code: "DEMO-XXXX-YYYY-ZZZZ" } });
-        setRewards((prev) => prev.filter((r) => r.id !== reward.id));
+        setSuccessModal({
+          open: true,
+          reward: isRaffleReward(reward)
+            ? { ...reward }
+            : { ...reward, code: "DEMO-XXXX-YYYY-ZZZZ" },
+        });
+        if (!isRaffleReward(reward)) {
+          setRewards((prev) => prev.filter((r) => r.id !== reward.id));
+        }
       } else {
         const message = err instanceof Error ? err.message : "Unbekannter Fehler";
         toast.error("Einlösen fehlgeschlagen", { description: message });
@@ -278,6 +255,28 @@ export default function DashboardClient() {
     user?.user_metadata?.name ??
     user?.email ??
     "Spieler";
+
+  const directRewards = rewards.filter((r) => !isRaffleReward(r));
+  const raffleRewards = rewards.filter((r) => isRaffleReward(r));
+
+  const renderRewardGrid = (items: Reward[]) => (
+    <div className={`grid sm:grid-cols-2 ${items.some(isRaffleReward) ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-5`}>
+      {items.map((reward) => {
+        const canAfford = !!playerData && playerData.loot_coins >= reward.cost_coins;
+        const isClaiming = claimingId === reward.id;
+        return (
+          <RewardCard
+            key={reward.id}
+            reward={reward}
+            onClaim={() => handleClaim(reward)}
+            canAfford={canAfford}
+            isClaiming={isClaiming}
+            disabled={!!claimingId && !isClaiming}
+          />
+        );
+      })}
+    </div>
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
@@ -382,160 +381,80 @@ export default function DashboardClient() {
       </div>
 
       {/* ── SHOP ────────────────────────────────────────────────────────── */}
-      <div id="shop" className="scroll-mt-20">
-        <div className="flex items-center gap-3 mb-6">
+      <div id="shop" className="scroll-mt-20 space-y-12">
+        <div className="flex items-center gap-3">
           <div className="h-8 w-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
             <ShoppingBag className="h-4 w-4 text-primary" />
           </div>
           <h2 className="text-xl font-bold">Reward Shop</h2>
           {!loadingRewards && (
-            <Badge
-              variant="outline"
-              className="border-primary/30 text-primary bg-primary/10"
-            >
+            <Badge variant="outline" className="border-primary/30 text-primary bg-primary/10">
               {rewards.length} verfügbar
             </Badge>
           )}
         </div>
 
         {loadingRewards ? (
-          // Loading Skeletons
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {Array.from({ length: 6 }).map((_, i) => (
               <Card key={i} className="bg-card/60 border-border/50">
                 <CardHeader>
                   <Skeleton className="h-5 w-3/4" />
-                  <Skeleton className="h-4 w-1/4 mt-1" />
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-2/3" />
-                  <div className="flex justify-between pt-2">
-                    <Skeleton className="h-6 w-24" />
-                    <Skeleton className="h-9 w-24" />
-                  </div>
+                  <Skeleton className="h-9 w-24" />
                 </CardContent>
               </Card>
             ))}
           </div>
-        ) : rewards.length === 0 ? (
-          // Empty State
-          <Card className="bg-card/40 border-border/40 text-center py-16">
-            <CardContent>
-              <Gift className="mx-auto h-10 w-10 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">
-                Alle Rewards eingelöst
-              </h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Aktuell sind keine weiteren Rewards verfügbar. Schau bald wieder
-                vorbei!
-              </p>
-              <Button
-                variant="outline"
-                onClick={loadRewards}
-                className="border-primary/30 hover:border-primary/60"
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Neu laden
-              </Button>
-            </CardContent>
-          </Card>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {rewards.map((reward) => {
-              const canAfford =
-                !!playerData && playerData.loot_coins >= reward.cost_coins;
-              const isClaiming = claimingId === reward.id;
-
-              return (
-                <Card
-                  key={reward.id}
-                  className={`bg-card/60 border-border/50 flex flex-col transition-all duration-300 ${
-                    canAfford
-                      ? "hover:border-primary/40 hover:bg-card"
-                      : "opacity-60"
-                  }`}
-                >
-                  {/* Top accent bar */}
-                  <div
-                    className={`h-0.5 w-full rounded-t-xl ${
-                      canAfford
-                        ? "bg-gradient-to-r from-primary/60 to-primary/20"
-                        : "bg-gradient-to-r from-muted/60 to-muted/20"
-                    }`}
-                  />
-
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-sm font-semibold leading-snug">
-                        {reward.title}
-                      </CardTitle>
-                      <Badge
-                        variant="outline"
-                        className={`shrink-0 text-xs ${
-                          canAfford
-                            ? "border-primary/30 text-primary bg-primary/10"
-                            : "border-muted text-muted-foreground"
-                        }`}
-                      >
-                        {reward.reward_type}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="flex flex-col gap-4 flex-1">
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      {reward.description}
-                    </p>
-
-                    <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/40">
-                      {/* Preis */}
-                      <div className="flex items-center gap-1.5">
-                        <Coins className="h-3.5 w-3.5 text-primary" />
-                        <span
-                          className={`text-base font-bold ${
-                            canAfford ? "neon-text" : "text-muted-foreground"
-                          }`}
-                        >
-                          {reward.cost_coins.toLocaleString("de-DE")}
-                        </span>
-                        <span className="text-xs text-muted-foreground">LC</span>
-                      </div>
-
-                      {/* Einlösen-Button */}
-                      <Button
-                        size="sm"
-                        disabled={!canAfford || !!claimingId}
-                        onClick={() => handleClaim(reward)}
-                        className={`text-xs h-8 px-4 ${
-                          canAfford ? "neon-glow" : ""
-                        }`}
-                        title={
-                          !canAfford
-                            ? `Du brauchst noch ${(reward.cost_coins - (playerData?.loot_coins ?? 0)).toLocaleString("de-DE")} LC`
-                            : "Reward einlösen"
-                        }
-                      >
-                        {isClaiming ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : !canAfford ? (
-                          <>
-                            <AlertCircle className="mr-1 h-3 w-3" />
-                            Zu wenig LC
-                          </>
-                        ) : (
-                          <>
-                            <Zap className="mr-1 h-3 w-3" />
-                            Einlösen
-                          </>
-                        )}
-                      </Button>
-                    </div>
+          <>
+            {/* Direkt einlösen */}
+            <div>
+              <div className="mb-6">
+                <h3 className="text-lg font-black uppercase tracking-tight">Guthaben & Rabatte</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Sofort einlösbar — Steam-Guthaben, Rabatte und In-Game-Vorteile.
+                </p>
+              </div>
+              {directRewards.length === 0 ? (
+                <Card className="bg-card/40 border-border/40 text-center py-12">
+                  <CardContent>
+                    <Gift className="mx-auto h-8 w-8 text-muted-foreground mb-3" />
+                    <p className="text-sm text-muted-foreground">Keine direkten Rewards verfügbar.</p>
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
+              ) : (
+                renderRewardGrid(directRewards)
+              )}
+            </div>
+
+            {/* Verlosungs-Tickets */}
+            <div className="rounded-2xl border border-amber-200/60 bg-amber-50/40 p-6 sm:p-8">
+              <div className="mb-6 flex items-start gap-3">
+                <div className="h-10 w-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                  <Ticket className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black uppercase tracking-tight">
+                    Verlosungs-Tickets
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Kaufe günstige Tickets für die Chance auf begehrte Hauptpreise — z.&nbsp;B.
+                    25€ Steam-Gutschein für nur 500 LC pro Ticket.
+                  </p>
+                </div>
+              </div>
+              {raffleRewards.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Aktuell keine Verlosungen aktiv.
+                </p>
+              ) : (
+                renderRewardGrid(raffleRewards)
+              )}
+            </div>
+          </>
         )}
       </div>
 
@@ -556,10 +475,17 @@ export default function DashboardClient() {
               </div>
             </div>
             <DialogTitle className="text-center text-xl">
-              Reward erfolgreich eingelöst!
+              {successModal.reward && isRaffleReward(successModal.reward)
+                ? "Ticket gekauft!"
+                : "Reward erfolgreich eingelöst!"}
             </DialogTitle>
             <DialogDescription className="text-center">
               {successModal.reward?.title}
+              {successModal.reward && isRaffleReward(successModal.reward) && successModal.reward.draw_date && (
+                <span className="block mt-1 text-amber-600 font-medium">
+                  Ziehung: {successModal.reward.draw_date}
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -599,10 +525,12 @@ export default function DashboardClient() {
               </Button>
             )}
 
-            {/* Kein Code / Link vorhanden */}
+            {/* Kein Code / Link — Verlosung oder In-Game */}
             {!successModal.reward?.code && !successModal.reward?.link && (
               <div className="rounded-lg border border-border/50 bg-secondary/30 px-4 py-3 text-sm text-muted-foreground text-center">
-                Du erhältst deinen Reward innerhalb von 24 Stunden über Discord.
+                {successModal.reward && isRaffleReward(successModal.reward)
+                  ? "Dein Ticket ist registriert. Du wirst per Discord benachrichtigt, falls du gewinnst. Viel Glück!"
+                  : "Du erhältst deinen Reward innerhalb von 24 Stunden über Discord."}
               </div>
             )}
 
