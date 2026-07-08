@@ -15,13 +15,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LootDrop — Dein Gameplay. Echte Rewards.",
+  title: "LootDrop — Level Up, Earn Real Rewards.",
   description:
-    "Die B2B Gaming Loyalty Plattform. Verdiene LootCoins auf deinem Minecraft-Server und löse sie gegen echte Rewards ein.",
-  keywords: ["Minecraft", "Gaming", "Loyalty", "Rewards", "Discord"],
+    "Verdiene LootCoins auf deinen Lieblingsservern und löse sie gegen echte Belohnungen ein. Die Gaming Loyalty Plattform für Minecraft.",
+  keywords: ["Minecraft", "Gaming", "Loyalty", "Rewards", "Discord", "LootCoins"],
   openGraph: {
-    title: "LootDrop",
-    description: "Dein Gameplay. Echte Rewards.",
+    title: "LootDrop — Level Up, Earn Real Rewards.",
+    description: "Verdiene LootCoins auf deinen Lieblingsservern.",
     type: "website",
   },
 };
@@ -32,17 +32,27 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="de"
-      className={`${geistSans.variable} ${geistMono.variable} dark`}
-    >
+    <html lang="de" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="min-h-screen bg-background text-foreground antialiased flex flex-col">
         <NavbarShell />
         <main className="flex-1">{children}</main>
-        <Toaster position="bottom-right" theme="dark" />
-        <footer className="border-t border-border/50 py-6 text-center text-xs text-muted-foreground">
-          <div className="mx-auto max-w-7xl px-4">
-            © {new Date().getFullYear()} LootDrop — Die Gaming Loyalty Plattform
+        <Toaster position="bottom-right" />
+        <footer className="border-t border-border py-10">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-black tracking-tight uppercase">LootDrop</span>
+              <span className="text-xs text-muted-foreground font-medium tracking-widest uppercase">
+                Gaming Loyalty
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              © {new Date().getFullYear()} LootDrop. Alle Rechte vorbehalten.
+            </p>
+            <div className="flex items-center gap-5 text-sm text-muted-foreground">
+              <a href="/faq" className="hover:text-foreground transition-colors">FAQ</a>
+              <a href="/affiliate" className="hover:text-foreground transition-colors">Affiliate</a>
+              <a href="/partner" className="hover:text-foreground transition-colors">Partner</a>
+            </div>
           </div>
         </footer>
       </body>

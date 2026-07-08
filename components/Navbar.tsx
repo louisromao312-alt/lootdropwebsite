@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { supabase, signOut } from "@/utils/supabase";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -13,23 +12,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Shield,
-  Zap,
-  LayoutDashboard,
-  ShoppingBag,
-  Server,
-  LogOut,
-  Menu,
-  X,
-} from "lucide-react";
+import { LogOut, LayoutDashboard, Shield, Menu, X } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
-const navLinks = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard#shop", label: "Shop", icon: ShoppingBag },
-  { href: "/servers", label: "Server-Liste", icon: Server },
-  { href: "/admin", label: "Admin", icon: Shield },
+const NAV_LINKS = [
+  { href: "/", label: "Home" },
+  { href: "/affiliate", label: "Affiliate" },
+  { href: "/faq", label: "FAQ" },
+  { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/partner", label: "Partner werden" },
 ];
 
 export default function Navbar() {
@@ -38,159 +29,148 @@ export default function Navbar() {
   const pathname = usePathname();
 
   useEffect(() => {
-    const loadUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user ?? null);
-    };
-
-    void loadUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_OUT") {
-        setUser(null);
-        return;
-      }
-      if (session?.user) {
-        setUser(session.user);
-      }
+    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(event === "SIGNED_OUT" ? null : (session?.user ?? null));
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleSignOut = async () => {
-    await signOut();
-    setMobileOpen(false);
-  };
-
-  const userAvatarUrl =
-    user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture;
   const userDisplayName =
     user?.user_metadata?.full_name ??
     user?.user_metadata?.name ??
-    user?.email ??
+    user?.user_metadata?.user_name ??
+    user?.email?.split("@")[0] ??
     "User";
-  const userInitials = userDisplayName.slice(0, 2).toUpperCase();
+
+  const userAvatarUrl = user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur-md border-b border-border">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link
-          href="/"
-          className="flex items-center gap-2 group"
-          onClick={() => setMobileOpen(false)}
-        >
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 border border-primary/30 group-hover:neon-glow transition-all duration-300">
-            <Zap className="h-4 w-4 text-primary" />
-          </div>
-          <span className="text-lg font-bold tracking-tight">
-            <span className="neon-text">Loot</span>
-            <span className="text-foreground">Drop</span>
+
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-1.5 group" onClick={() => setMobileOpen(false)}>
+          <span className="text-2xl font-black tracking-tight uppercase leading-none">
+            Loot<span className="text-primary">Drop</span>
           </span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-1">
-          {navLinks.map(({ href, label, icon: Icon }) => {
-            const isActive =
-              pathname === href ||
-              (href === "/admin" && pathname.startsWith("/admin")) ||
-              pathname.startsWith(href + "/");
+        {/* Desktop Nav */}
+        <div className="hidden lg:flex items-center gap-1">
+          {NAV_LINKS.map(({ href, label }) => {
+            const isActive = pathname === href;
             return (
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                   isActive
-                    ? "text-primary bg-primary/10"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                    ? "text-foreground bg-black/5"
+                    : "text-muted-foreground hover:text-foreground hover:bg-black/5"
                 }`}
               >
-                <Icon className="h-4 w-4" />
                 {label}
               </Link>
             );
           })}
+          <Link
+            href="/admin"
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              pathname.startsWith("/admin")
+                ? "text-primary bg-primary/10"
+                : "text-muted-foreground hover:text-foreground hover:bg-black/5"
+            }`}
+          >
+            Admin
+          </Link>
         </div>
 
+        {/* Right: CTA / User */}
         <div className="flex items-center gap-3">
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 rounded-full border border-border/50 pl-2 pr-3 py-1 hover:border-primary/40 hover:bg-white/5 transition-all duration-200 focus:outline-none">
+                <button className="flex items-center gap-2.5 rounded-full border border-border pl-2 pr-3 py-1.5 hover:bg-black/5 transition-colors focus:outline-none">
                   <Avatar className="h-7 w-7">
                     <AvatarImage src={userAvatarUrl} alt={userDisplayName} />
-                    <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                      {userInitials}
+                    <AvatarFallback className="text-xs font-bold bg-primary text-primary-foreground">
+                      {userDisplayName.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-sm font-medium text-foreground hidden sm:block max-w-24 truncate">
+                  <span className="text-sm font-semibold hidden sm:block max-w-28 truncate">
                     {userDisplayName}
                   </span>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-52 rounded-xl shadow-lg border border-border">
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard" className="flex items-center gap-2">
+                  <Link href="/dashboard" className="flex items-center gap-2 font-medium">
                     <LayoutDashboard className="h-4 w-4" />
                     Dashboard
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/admin" className="flex items-center gap-2">
+                  <Link href="/admin" className="flex items-center gap-2 font-medium">
                     <Shield className="h-4 w-4" />
                     Admin
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={handleSignOut}
-                  className="text-destructive focus:text-destructive flex items-center gap-2 cursor-pointer"
+                  onClick={() => signOut()}
+                  className="text-destructive focus:text-destructive flex items-center gap-2 font-medium cursor-pointer"
                 >
                   <LogOut className="h-4 w-4" />
-                  Ausloggen
+                  Abmelden
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button asChild size="sm" className="neon-glow hidden md:flex">
-              <Link href="/login">Mit Discord einloggen</Link>
-            </Button>
+            <Link href="/login" className="btn-cta text-sm py-2.5 px-5 hidden sm:inline-flex">
+              LOGIN
+            </Link>
           )}
 
+          {/* Mobile toggle */}
           <button
-            className="md:hidden p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition"
+            className="lg:hidden p-2 rounded-lg hover:bg-black/5 transition-colors"
             onClick={() => setMobileOpen((o) => !o)}
-            aria-label="Navigation öffnen"
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
       </nav>
 
+      {/* Mobile drawer */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-border/50 bg-background/95 backdrop-blur-md px-4 pb-4 pt-2">
+        <div className="lg:hidden border-t border-border bg-background px-4 pb-5 pt-3">
           <div className="flex flex-col gap-1">
-            {navLinks.map(({ href, label, icon: Icon }) => (
+            {NAV_LINKS.map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
                 onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition"
+                className="px-4 py-3 rounded-lg text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-black/5 transition-colors"
               >
-                <Icon className="h-4 w-4" />
                 {label}
               </Link>
             ))}
+            <Link
+              href="/admin"
+              onClick={() => setMobileOpen(false)}
+              className="px-4 py-3 rounded-lg text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-black/5 transition-colors"
+            >
+              Admin
+            </Link>
             {!user && (
-              <Button asChild className="mt-2 neon-glow">
-                <Link href="/login" onClick={() => setMobileOpen(false)}>
-                  Mit Discord einloggen
-                </Link>
-              </Button>
+              <Link
+                href="/login"
+                onClick={() => setMobileOpen(false)}
+                className="btn-cta mt-2 justify-center"
+              >
+                LOGIN
+              </Link>
             )}
           </div>
         </div>
