@@ -1,6 +1,4 @@
-import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { redirect } from "next/navigation";
-import AdminDashboardGate from "./AdminDashboardGate";
+import AdminDashboardClient from "./AdminDashboardClient";
 
 export const metadata = {
   title: "LootDrop Admin — Mission Control",
@@ -9,10 +7,7 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
+/** Dev-Phase: öffentlich zugänglich ohne Login. */
 export default function AdminDashboardPage() {
-  if (!isSupabaseConfigured()) {
-    redirect("/login");
-  }
-
-  return <AdminDashboardGate />;
+  return <AdminDashboardClient adminLabel="Mission Control" />;
 }

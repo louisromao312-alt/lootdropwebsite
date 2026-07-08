@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { supabase, signOut } from "@/utils/supabase";
-import { isAdminUser } from "@/lib/admin";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -30,21 +29,13 @@ const navLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard#shop", label: "Shop", icon: ShoppingBag },
   { href: "/servers", label: "Server-Liste", icon: Server },
+  { href: "/admin", label: "Admin", icon: Shield },
 ];
 
-type NavbarProps = {
-  initialIsAdmin?: boolean;
-};
-
-export default function Navbar({ initialIsAdmin = false }: NavbarProps) {
+export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
-  const [isAdmin, setIsAdmin] = useState(initialIsAdmin);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
-
-  const resolveAdminStatus = (currentUser: User | null) => {
-    setIsAdmin(currentUser ? isAdminUser(currentUser) || initialIsAdmin : false);
-  };
 
   useEffect(() => {
     const loadUser = async () => {
@@ -52,7 +43,6 @@ export default function Navbar({ initialIsAdmin = false }: NavbarProps) {
         data: { user },
       } = await supabase.auth.getUser();
       setUser(user ?? null);
-      resolveAdminStatus(user ?? null);
     };
 
     void loadUser();
@@ -62,17 +52,15 @@ export default function Navbar({ initialIsAdmin = false }: NavbarProps) {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") {
         setUser(null);
-        setIsAdmin(false);
         return;
       }
       if (session?.user) {
         setUser(session.user);
-        resolveAdminStatus(session.user);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [initialIsAdmin]);
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
@@ -107,7 +95,10 @@ export default function Navbar({ initialIsAdmin = false }: NavbarProps) {
 
         <div className="hidden md:flex items-center gap-1">
           {navLinks.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname === href || pathname.startsWith(href + "/");
+            const isActive =
+              pathname === href ||
+              (href === "/admin" && pathname.startsWith("/admin")) ||
+              pathname.startsWith(href + "/");
             return (
               <Link
                 key={href}
@@ -123,19 +114,6 @@ export default function Navbar({ initialIsAdmin = false }: NavbarProps) {
               </Link>
             );
           })}
-          {isAdmin && (
-            <Link
-              href="/admin/dashboard"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
-                pathname.startsWith("/admin")
-                  ? "text-primary bg-primary/10"
-                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-              }`}
-            >
-              <Shield className="h-4 w-4" />
-              Mission Control
-            </Link>
-          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -161,14 +139,12 @@ export default function Navbar({ initialIsAdmin = false }: NavbarProps) {
                     Dashboard
                   </Link>
                 </DropdownMenuItem>
-                {isAdmin && (
-                  <DropdownMenuItem asChild>
-                    <Link href="/admin/dashboard" className="flex items-center gap-2">
-                      <Shield className="h-4 w-4" />
-                      Mission Control
-                    </Link>
-                  </DropdownMenuItem>
-                )}
+                <DropdownMenuItem asChild>
+                  <Link href="/admin" className="flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Admin
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleSignOut}
@@ -209,16 +185,6 @@ export default function Navbar({ initialIsAdmin = false }: NavbarProps) {
                 {label}
               </Link>
             ))}
-            {isAdmin && (
-              <Link
-                href="/admin/dashboard"
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition"
-              >
-                <Shield className="h-4 w-4" />
-                Mission Control
-              </Link>
-            )}
             {!user && (
               <Button asChild className="mt-2 neon-glow">
                 <Link href="/login" onClick={() => setMobileOpen(false)}>

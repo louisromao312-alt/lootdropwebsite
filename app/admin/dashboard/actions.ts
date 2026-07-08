@@ -209,8 +209,8 @@ export async function checkAdminAccess(): Promise<{
 }
 
 export async function getAdminDashboardData(): Promise<AdminDashboardData> {
-  await requireAdmin();
-  const db = createServiceRoleClient();
+  try {
+    const db = createServiceRoleClient();
 
   const [pluginLastSeen, botLastSeen, logs, totalRevenue, redemptionsPerDay, serverBudgets] =
     await Promise.all([
@@ -230,14 +230,43 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     redemptionsPerDay,
     serverBudgets,
   };
+  } catch {
+    return emptyAdminDashboardData();
+  }
+}
+
+function emptyAdminDashboardData(): AdminDashboardData {
+  const days: RedemptionDay[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push({ date: d.toISOString().slice(0, 10), count: 0 });
+  }
+
+  return {
+    pluginHealth: {
+      status: "OFFLINE",
+      label: "OFFLINE",
+      lastSeen: null,
+      detail: "Keine Verbindung zu Supabase (Service Role Key prüfen).",
+    },
+    botHealth: {
+      status: "OFFLINE",
+      label: "OFFLINE",
+      lastSeen: null,
+      detail: "Keine Verbindung zu Supabase (Service Role Key prüfen).",
+    },
+    totalRevenue: 0,
+    logs: [],
+    redemptionsPerDay: days,
+    serverBudgets: [],
+  };
 }
 
 export async function increaseServerBudget(
   serverSlug: string,
   amount: number
 ): Promise<{ success: boolean; newBudget: number }> {
-  await requireAdmin();
-
   if (!serverSlug?.trim()) {
     throw new Error("Server-Slug ist erforderlich.");
   }
